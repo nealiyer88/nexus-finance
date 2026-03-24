@@ -1,0 +1,183 @@
+{
+  "description": "Ground truth entity mappings for cross-category resolution validation.",
+  "canonical_entities": [
+    {
+      "canonical_id": "CAN-001",
+      "canonical_name": "Cenlar FSB",
+      "entity_type": "client",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-001",
+          "display_name": "Cenlar, LLC."
+        },
+        "ruddr": {
+          "id": "RUDDR-001",
+          "slug": "cenlar-fsb",
+          "display_name": "Cenlar FSB"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match"
+      ],
+      "confidence": 0.96
+    },
+    {
+      "canonical_id": "CAN-002",
+      "canonical_name": "Meridian Capital Group",
+      "entity_type": "client",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-002",
+          "display_name": "Meridian Capital Group LLC"
+        },
+        "ruddr": {
+          "id": "RUDDR-002",
+          "slug": "meridian-cap",
+          "display_name": "Meridian Capital"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match"
+      ],
+      "confidence": 0.89
+    },
+    {
+      "canonical_id": "CAN-003",
+      "canonical_name": "TechVentures",
+      "entity_type": "client",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-003",
+          "display_name": "TechVentures Inc"
+        },
+        "ruddr": {
+          "id": "RUDDR-003",
+          "slug": "techventures-io",
+          "display_name": "TechVentures"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match"
+      ],
+      "confidence": 0.91
+    },
+    {
+      "canonical_id": "CAN-004",
+      "canonical_name": "Apex Logistics",
+      "entity_type": "client",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-004",
+          "display_name": "Apex Logistics Co."
+        },
+        "ruddr": {
+          "id": "RUDDR-004",
+          "slug": "apex-log",
+          "display_name": "Apex Logistics"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match"
+      ],
+      "confidence": 0.89
+    },
+    {
+      "canonical_id": "CAN-005",
+      "canonical_name": "Greenfield Analytics",
+      "entity_type": "client",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-005",
+          "display_name": "GreenField Analytics, LLC"
+        },
+        "ruddr": {
+          "id": "RUDDR-005",
+          "slug": "greenfield-analytics",
+          "display_name": "Greenfield Analytics"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match"
+      ],
+      "confidence": 0.93
+    },
+    {
+      "canonical_id": "CAN-006",
+      "canonical_name": "Northstar Health Systems",
+      "entity_type": "client",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-006",
+          "display_name": "Northstar Health Systems"
+        },
+        "ruddr": {
+          "id": "RUDDR-006",
+          "slug": "northstar-health",
+          "display_name": "NorthStar Health"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match"
+      ],
+      "confidence": 0.98
+    },
+    {
+      "canonical_id": "CAN-007",
+      "canonical_name": "Summit Partners",
+      "entity_type": "client",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-007",
+          "display_name": "Summit Partners Capital"
+        },
+        "ruddr": {
+          "id": "RUDDR-007",
+          "slug": "summit-partners",
+          "display_name": "Summit Partners"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match"
+      ],
+      "confidence": 0.94
+    },
+    {
+      "canonical_id": "CAN-008",
+      "canonical_name": "DataBridge Solutions",
+      "entity_type": "vendor",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-008",
+          "display_name": "DataBridge Solutions"
+        },
+        "ruddr": {
+          "id": "RUDDR-008",
+          "slug": "databridge-sol",
+          "display_name": "DataBridge"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match"
+      ],
+      "confidence": 0.89
+    }
+  ],
+  "unmatched": {
+    "quickbooks": [],
+    "ruddr": [
+      {
+        "id": "RUDDR-009",
+        "display_name": "Riverstone Capital Advisors",
+        "reason": "No corresponding QB record \u2014 client onboarded in RUDDR only"
+      }
+    ]
+  }
+}

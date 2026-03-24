@@ -1,0 +1,281 @@
+[
+  {
+    "id": "RUDDR-001",
+    "source": "ruddr",
+    "slug": "cenlar-fsb",
+    "display_name": "Cenlar FSB",
+    "type": "client",
+    "projects": [
+      {
+        "code": "CEN-RSR-SOW1",
+        "name": "Lending Platform Redesign",
+        "status": "completed",
+        "budget_hours": 400,
+        "logged_hours": 251.0,
+        "hourly_rate": 244.79
+      },
+      {
+        "code": "CEN-MHY-SOW2",
+        "name": "Executive Dashboard",
+        "status": "active",
+        "budget_hours": 1200,
+        "logged_hours": 289.4,
+        "hourly_rate": 179.78
+      }
+    ],
+    "tags": [
+      "financial-services",
+      "enterprise"
+    ],
+    "created_at": "2024-06-10T00:00:00+00:00",
+    "last_activity": "2025-07-25T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-002",
+    "source": "ruddr",
+    "slug": "meridian-cap",
+    "display_name": "Meridian Capital",
+    "type": "client",
+    "projects": [
+      {
+        "code": "MER-FY-SOW1",
+        "name": "EMR Interoperability",
+        "status": "active",
+        "budget_hours": 800,
+        "logged_hours": 201.0,
+        "hourly_rate": 265.01
+      },
+      {
+        "code": "MER-DDTOT-SOW2",
+        "name": "BI Platform Phase 2",
+        "status": "active",
+        "budget_hours": 900,
+        "logged_hours": 772.7,
+        "hourly_rate": 178.51
+      }
+    ],
+    "tags": [
+      "financial-services",
+      "mid-market"
+    ],
+    "created_at": "2024-09-17T00:00:00+00:00",
+    "last_activity": "2025-09-10T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-003",
+    "source": "ruddr",
+    "slug": "techventures-io",
+    "display_name": "TechVentures",
+    "type": "client",
+    "projects": [
+      {
+        "code": "TEC-WD-SOW1",
+        "name": "BI Platform Phase 2",
+        "status": "completed",
+        "budget_hours": 500,
+        "logged_hours": 386.6,
+        "hourly_rate": 158.26
+      }
+    ],
+    "tags": [
+      "technology",
+      "boutique"
+    ],
+    "created_at": "2024-11-01T00:00:00+00:00",
+    "last_activity": "2025-08-28T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-004",
+    "source": "ruddr",
+    "slug": "apex-log",
+    "display_name": "Apex Logistics",
+    "type": "client",
+    "projects": [
+      {
+        "code": "APE-ZWAS-SOW1",
+        "name": "CRM Migration",
+        "status": "active",
+        "budget_hours": 1200,
+        "logged_hours": 868.5,
+        "hourly_rate": 164.5
+      },
+      {
+        "code": "APE-EASSZ-SOW2",
+        "name": "Data Migration",
+        "status": "completed",
+        "budget_hours": 500,
+        "logged_hours": 265.8,
+        "hourly_rate": 188.8
+      },
+      {
+        "code": "APE-DTO-SOW3",
+        "name": "Staff Augmentation",
+        "status": "active",
+        "budget_hours": 1200,
+        "logged_hours": 1051.2,
+        "hourly_rate": 213.52
+      }
+    ],
+    "tags": [
+      "logistics",
+      "enterprise"
+    ],
+    "created_at": "2024-07-04T00:00:00+00:00",
+    "last_activity": "2025-06-07T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-005",
+    "source": "ruddr",
+    "slug": "greenfield-analytics",
+    "display_name": "Greenfield Analytics",
+    "type": "client",
+    "projects": [
+      {
+        "code": "GRE-GO-SOW1",
+        "name": "EMR Interoperability",
+        "status": "active",
+        "budget_hours": 400,
+        "logged_hours": 78.3,
+        "hourly_rate": 277.14
+      }
+    ],
+    "tags": [
+      "analytics",
+      "mid-market"
+    ],
+    "created_at": "2024-03-06T00:00:00+00:00",
+    "last_activity": "2025-12-04T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-006",
+    "source": "ruddr",
+    "slug": "northstar-health",
+    "display_name": "NorthStar Health",
+    "type": "client",
+    "projects": [
+      {
+        "code": "NOR-GWL-SOW1",
+        "name": "MLOps Infrastructure",
+        "status": "completed",
+        "budget_hours": 600,
+        "logged_hours": 533.0,
+        "hourly_rate": 190.52
+      },
+      {
+        "code": "NOR-LNDF-SOW2",
+        "name": "Portfolio Analytics Tool",
+        "status": "active",
+        "budget_hours": 800,
+        "logged_hours": 64.9,
+        "hourly_rate": 226.5
+      }
+    ],
+    "tags": [
+      "healthcare",
+      "enterprise"
+    ],
+    "created_at": "2024-02-06T00:00:00+00:00",
+    "last_activity": "2025-12-29T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-007",
+    "source": "ruddr",
+    "slug": "summit-partners",
+    "display_name": "Summit Partners",
+    "type": "client",
+    "projects": [
+      {
+        "code": "SUM-FX-SOW1",
+        "name": "MLOps Infrastructure",
+        "status": "active",
+        "budget_hours": 800,
+        "logged_hours": 100.3,
+        "hourly_rate": 236.97
+      },
+      {
+        "code": "SUM-OSW-SOW2",
+        "name": "EMR Interoperability",
+        "status": "active",
+        "budget_hours": 2000,
+        "logged_hours": 924.4,
+        "hourly_rate": 174.75
+      },
+      {
+        "code": "SUM-RJ-SOW3",
+        "name": "GenAI Platform Build",
+        "status": "completed",
+        "budget_hours": 900,
+        "logged_hours": 426.0,
+        "hourly_rate": 234.95
+      }
+    ],
+    "tags": [
+      "financial-services",
+      "enterprise"
+    ],
+    "created_at": "2024-02-01T00:00:00+00:00",
+    "last_activity": "2025-07-26T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-008",
+    "source": "ruddr",
+    "slug": "databridge-sol",
+    "display_name": "DataBridge",
+    "type": "vendor",
+    "projects": [
+      {
+        "code": "DAT-UCEN-SOW1",
+        "name": "ERP Integration",
+        "status": "active",
+        "budget_hours": 500,
+        "logged_hours": 229.3,
+        "hourly_rate": 182.47
+      },
+      {
+        "code": "DAT-LW-SOW2",
+        "name": "CRM Migration",
+        "status": "completed",
+        "budget_hours": 1200,
+        "logged_hours": 156.7,
+        "hourly_rate": 258.68
+      },
+      {
+        "code": "DAT-YW-SOW3",
+        "name": "EMR Interoperability",
+        "status": "active",
+        "budget_hours": 500,
+        "logged_hours": 222.7,
+        "hourly_rate": 262.4
+      }
+    ],
+    "tags": [
+      "technology",
+      "enterprise"
+    ],
+    "created_at": "2024-03-25T00:00:00+00:00",
+    "last_activity": "2025-07-14T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-009",
+    "source": "ruddr",
+    "slug": "riverstone-cap",
+    "display_name": "Riverstone Capital Advisors",
+    "type": "client",
+    "projects": [
+      {
+        "code": "RIV-GULKY-SOW1",
+        "name": "EMR Interoperability",
+        "status": "active",
+        "budget_hours": 1200,
+        "logged_hours": 771.4,
+        "hourly_rate": 174.69
+      }
+    ],
+    "tags": [
+      "financial-services",
+      "mid-market"
+    ],
+    "created_at": "2024-01-30T00:00:00+00:00",
+    "last_activity": "2025-10-24T00:00:00+00:00"
+  }
+]
