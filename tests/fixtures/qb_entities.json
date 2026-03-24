@@ -1,0 +1,146 @@
+[
+  {
+    "id": "QB-001",
+    "source": "quickbooks",
+    "display_name": "Cenlar, LLC.",
+    "type": "Customer",
+    "email": "billing@cenlarfsb.com",
+    "phone": "225-555-0859",
+    "balance": 36628.37,
+    "currency": "USD",
+    "address": {
+      "line1": "458 Market St",
+      "city": "Ewing",
+      "state": "NJ",
+      "postal_code": "23434"
+    },
+    "created_at": "2024-12-12T00:00:00+00:00",
+    "last_modified": "2025-10-07T00:00:00+00:00"
+  },
+  {
+    "id": "QB-002",
+    "source": "quickbooks",
+    "display_name": "Meridian Capital Group LLC",
+    "type": "Customer",
+    "email": "billing@meridiancap.com",
+    "phone": "804-555-0532",
+    "balance": 8655.01,
+    "currency": "USD",
+    "address": {
+      "line1": "192 Market St",
+      "city": "New York",
+      "state": "NY",
+      "postal_code": "40495"
+    },
+    "created_at": "2024-09-15T00:00:00+00:00",
+    "last_modified": "2025-11-05T00:00:00+00:00"
+  },
+  {
+    "id": "QB-003",
+    "source": "quickbooks",
+    "display_name": "TechVentures Inc",
+    "type": "Customer",
+    "email": "ap@techventuresio.com",
+    "phone": "774-555-0303",
+    "balance": 87342.26,
+    "currency": "USD",
+    "address": {
+      "line1": "1437 Adams St",
+      "city": "San Francisco",
+      "state": "CA",
+      "postal_code": "64987"
+    },
+    "created_at": "2024-04-22T00:00:00+00:00",
+    "last_modified": "2025-08-18T00:00:00+00:00"
+  },
+  {
+    "id": "QB-004",
+    "source": "quickbooks",
+    "display_name": "Apex Logistics Co.",
+    "type": "Customer",
+    "email": "invoices@apexlog.com",
+    "phone": "206-555-0877",
+    "balance": 97669.21,
+    "currency": "USD",
+    "address": {
+      "line1": "1430 Phillips St",
+      "city": "Chicago",
+      "state": "IL",
+      "postal_code": "54597"
+    },
+    "created_at": "2024-05-22T00:00:00+00:00",
+    "last_modified": "2025-03-21T00:00:00+00:00"
+  },
+  {
+    "id": "QB-005",
+    "source": "quickbooks",
+    "display_name": "GreenField Analytics, LLC",
+    "type": "Customer",
+    "email": "accounts@greenfieldanalytics.com",
+    "phone": "981-555-0444",
+    "balance": 16754.18,
+    "currency": "USD",
+    "address": {
+      "line1": "779 Main St",
+      "city": "Austin",
+      "state": "TX",
+      "postal_code": "57052"
+    },
+    "created_at": "2024-06-25T00:00:00+00:00",
+    "last_modified": "2025-11-06T00:00:00+00:00"
+  },
+  {
+    "id": "QB-006",
+    "source": "quickbooks",
+    "display_name": "Northstar Health Systems",
+    "type": "Customer",
+    "email": "invoices@northstarhealth.com",
+    "phone": "244-555-0847",
+    "balance": 57833.86,
+    "currency": "USD",
+    "address": {
+      "line1": "256 Phillips St",
+      "city": "Boston",
+      "state": "MA",
+      "postal_code": "20328"
+    },
+    "created_at": "2024-10-09T00:00:00+00:00",
+    "last_modified": "2025-05-31T00:00:00+00:00"
+  },
+  {
+    "id": "QB-007",
+    "source": "quickbooks",
+    "display_name": "Summit Partners Capital",
+    "type": "Customer",
+    "email": "admin@summitpartners.com",
+    "phone": "791-555-0296",
+    "balance": 86025.76,
+    "currency": "USD",
+    "address": {
+      "line1": "94 Berkeley St",
+      "city": "Boston",
+      "state": "MA",
+      "postal_code": "39871"
+    },
+    "created_at": "2024-05-28T00:00:00+00:00",
+    "last_modified": "2025-02-10T00:00:00+00:00"
+  },
+  {
+    "id": "QB-008",
+    "source": "quickbooks",
+    "display_name": "DataBridge Solutions",
+    "type": "Vendor",
+    "email": "accounts@databridgesol.com",
+    "phone": "303-555-0489",
+    "balance": -36966.96,
+    "currency": "USD",
+    "address": {
+      "line1": "1302 Francis St",
+      "city": "Reston",
+      "state": "VA",
+      "postal_code": "57819"
+    },
+    "created_at": "2024-03-24T00:00:00+00:00",
+    "last_modified": "2025-07-09T00:00:00+00:00"
+  }
+]
