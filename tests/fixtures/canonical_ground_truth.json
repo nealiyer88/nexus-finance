@@ -1,10 +1,31 @@
 {
   "description": "Ground truth entity mappings for cross-category resolution validation.",
+  "generated_at": "2026-03-25T02:42:56.075548+00:00",
+  "stats": {
+    "total_canonical": 44,
+    "org_pairs": 19,
+    "person_pairs": 25,
+    "unmatched_qb": 2,
+    "unmatched_ruddr": 1,
+    "departments": 6,
+    "org_patterns_covered": 13,
+    "person_patterns_covered": 8
+  },
+  "departments": {
+    "strategy-advisory": "Strategy & Advisory",
+    "data-engineering": "Data Engineering",
+    "software-development": "Software Development",
+    "cloud-infrastructure": "Cloud & Infrastructure",
+    "design-ux": "Design & UX",
+    "staff-augmentation": "Staff Augmentation"
+  },
   "canonical_entities": [
     {
       "canonical_id": "CAN-001",
       "canonical_name": "Cenlar FSB",
       "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "legal-suffix-strip",
       "sources": {
         "quickbooks": {
           "id": "QB-001",
@@ -18,14 +39,17 @@
       },
       "match_signals": [
         "name_fuzzy",
-        "name_prefix_match"
+        "name_prefix_match",
+        "suffix_strip"
       ],
-      "confidence": 0.96
+      "confidence": 0.97
     },
     {
       "canonical_id": "CAN-002",
       "canonical_name": "Meridian Capital Group",
       "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "abbreviation",
       "sources": {
         "quickbooks": {
           "id": "QB-002",
@@ -39,14 +63,17 @@
       },
       "match_signals": [
         "name_fuzzy",
-        "name_prefix_match"
+        "name_prefix_match",
+        "abbreviation_expansion"
       ],
-      "confidence": 0.89
+      "confidence": 0.96
     },
     {
       "canonical_id": "CAN-003",
       "canonical_name": "TechVentures",
       "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "case-variation",
       "sources": {
         "quickbooks": {
           "id": "QB-003",
@@ -60,14 +87,17 @@
       },
       "match_signals": [
         "name_fuzzy",
-        "name_prefix_match"
+        "name_prefix_match",
+        "case_normalize"
       ],
-      "confidence": 0.91
+      "confidence": 0.83
     },
     {
       "canonical_id": "CAN-004",
       "canonical_name": "Apex Logistics",
       "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "punctuation-diff",
       "sources": {
         "quickbooks": {
           "id": "QB-004",
@@ -81,77 +111,89 @@
       },
       "match_signals": [
         "name_fuzzy",
-        "name_prefix_match"
+        "name_prefix_match",
+        "punctuation_strip"
       ],
-      "confidence": 0.89
+      "confidence": 0.85
     },
     {
       "canonical_id": "CAN-005",
-      "canonical_name": "Greenfield Analytics",
+      "canonical_name": "Summit Partners",
       "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "word-order",
       "sources": {
         "quickbooks": {
           "id": "QB-005",
-          "display_name": "GreenField Analytics, LLC"
-        },
-        "ruddr": {
-          "id": "RUDDR-005",
-          "slug": "greenfield-analytics",
-          "display_name": "Greenfield Analytics"
-        }
-      },
-      "match_signals": [
-        "name_fuzzy",
-        "name_prefix_match"
-      ],
-      "confidence": 0.93
-    },
-    {
-      "canonical_id": "CAN-006",
-      "canonical_name": "Northstar Health Systems",
-      "entity_type": "client",
-      "sources": {
-        "quickbooks": {
-          "id": "QB-006",
-          "display_name": "Northstar Health Systems"
-        },
-        "ruddr": {
-          "id": "RUDDR-006",
-          "slug": "northstar-health",
-          "display_name": "NorthStar Health"
-        }
-      },
-      "match_signals": [
-        "name_fuzzy",
-        "name_prefix_match"
-      ],
-      "confidence": 0.98
-    },
-    {
-      "canonical_id": "CAN-007",
-      "canonical_name": "Summit Partners",
-      "entity_type": "client",
-      "sources": {
-        "quickbooks": {
-          "id": "QB-007",
           "display_name": "Summit Partners Capital"
         },
         "ruddr": {
-          "id": "RUDDR-007",
+          "id": "RUDDR-005",
           "slug": "summit-partners",
           "display_name": "Summit Partners"
         }
       },
       "match_signals": [
         "name_fuzzy",
-        "name_prefix_match"
+        "name_prefix_match",
+        "token_sort"
       ],
-      "confidence": 0.94
+      "confidence": 0.87
+    },
+    {
+      "canonical_id": "CAN-006",
+      "canonical_name": "Greenfield Analytics",
+      "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "dba-trade-name",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-006",
+          "display_name": "GreenField Analytics, LLC"
+        },
+        "ruddr": {
+          "id": "RUDDR-006",
+          "slug": "greenfield-analytics",
+          "display_name": "Greenfield Analytics"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match",
+        "dba_lookup"
+      ],
+      "confidence": 0.95
+    },
+    {
+      "canonical_id": "CAN-007",
+      "canonical_name": "Northstar Health Systems",
+      "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "truncation",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-007",
+          "display_name": "Northstar Health Systems"
+        },
+        "ruddr": {
+          "id": "RUDDR-007",
+          "slug": "northstar-health",
+          "display_name": "NorthStar Health"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match",
+        "slug_prefix"
+      ],
+      "confidence": 0.92
     },
     {
       "canonical_id": "CAN-008",
       "canonical_name": "DataBridge Solutions",
       "entity_type": "vendor",
+      "entity_category": "organization",
+      "pattern": "spacing-compound",
       "sources": {
         "quickbooks": {
           "id": "QB-008",
@@ -165,18 +207,865 @@
       },
       "match_signals": [
         "name_fuzzy",
-        "name_prefix_match"
+        "name_prefix_match",
+        "compound_split"
+      ],
+      "confidence": 0.87
+    },
+    {
+      "canonical_id": "CAN-009",
+      "canonical_name": "Vanguard Digital Labs",
+      "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "parent-subsidiary",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-009",
+          "display_name": "Vanguard Holdings Inc."
+        },
+        "ruddr": {
+          "id": "RUDDR-009",
+          "slug": "vanguard-digital",
+          "display_name": "Vanguard Digital Labs"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "corporate_hierarchy"
+      ],
+      "confidence": 0.84
+    },
+    {
+      "canonical_id": "CAN-010",
+      "canonical_name": "Beck & Howell Consulting",
+      "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "ampersand-and",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-010",
+          "display_name": "Beck & Howell Consulting Group"
+        },
+        "ruddr": {
+          "id": "RUDDR-010",
+          "slug": "beck-howell",
+          "display_name": "Beck and Howell Consulting"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match",
+        "symbol_normalize"
+      ],
+      "confidence": 0.94
+    },
+    {
+      "canonical_id": "CAN-011",
+      "canonical_name": "Briarwood Group",
+      "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "the-prefix-drop",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-011",
+          "display_name": "The Briarwood Group, LLC"
+        },
+        "ruddr": {
+          "id": "RUDDR-011",
+          "slug": "briarwood-group",
+          "display_name": "Briarwood Group"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match",
+        "prefix_strip"
+      ],
+      "confidence": 0.94
+    },
+    {
+      "canonical_id": "CAN-012",
+      "canonical_name": "Pinnacle Engineering",
+      "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "regional-qualifier-drop",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-012",
+          "display_name": "Pinnacle Engineering (Northeast)"
+        },
+        "ruddr": {
+          "id": "RUDDR-012",
+          "slug": "pinnacle-eng",
+          "display_name": "Pinnacle Engineering"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match",
+        "qualifier_strip"
+      ],
+      "confidence": 0.98
+    },
+    {
+      "canonical_id": "CAN-013",
+      "canonical_name": "Luminos AI",
+      "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "rebrand-alias",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-013",
+          "display_name": "BrightPath Machine Learning Corp"
+        },
+        "ruddr": {
+          "id": "RUDDR-013",
+          "slug": "luminos-ai",
+          "display_name": "Luminos AI"
+        }
+      },
+      "match_signals": [
+        "alias_table",
+        "manual_override"
+      ],
+      "confidence": 0.91
+    },
+    {
+      "canonical_id": "CAN-014",
+      "canonical_name": "Hargrove Financial",
+      "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "legal-suffix-strip",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-014",
+          "display_name": "Hargrove Financial Services, Inc."
+        },
+        "ruddr": {
+          "id": "RUDDR-014",
+          "slug": "hargrove-fin",
+          "display_name": "Hargrove Financial"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match",
+        "suffix_strip"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "canonical_id": "CAN-015",
+      "canonical_name": "Pacific Rim Technologies",
+      "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "abbreviation",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-015",
+          "display_name": "Pacific Rim Technologies International"
+        },
+        "ruddr": {
+          "id": "RUDDR-015",
+          "slug": "pacrim-tech",
+          "display_name": "PacRim Tech"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match",
+        "abbreviation_expansion"
+      ],
+      "confidence": 0.83
+    },
+    {
+      "canonical_id": "CAN-016",
+      "canonical_name": "Calloway Reed Partners",
+      "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "punctuation-diff",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-016",
+          "display_name": "Calloway, Reed & Partners LLC"
+        },
+        "ruddr": {
+          "id": "RUDDR-016",
+          "slug": "calloway-reed",
+          "display_name": "Calloway Reed Partners"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match",
+        "punctuation_strip"
+      ],
+      "confidence": 0.83
+    },
+    {
+      "canonical_id": "CAN-017",
+      "canonical_name": "Ironclad Security",
+      "entity_type": "vendor",
+      "entity_category": "organization",
+      "pattern": "dba-trade-name",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-017",
+          "display_name": "Ironclad Cybersecurity Solutions LLC"
+        },
+        "ruddr": {
+          "id": "RUDDR-017",
+          "slug": "ironclad-sec",
+          "display_name": "Ironclad Security"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "name_prefix_match",
+        "dba_lookup"
       ],
       "confidence": 0.89
+    },
+    {
+      "canonical_id": "CAN-018",
+      "canonical_name": "Atlas Media Group",
+      "entity_type": "client",
+      "entity_category": "organization",
+      "pattern": "parent-subsidiary",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-018",
+          "display_name": "Atlas Communications Corp."
+        },
+        "ruddr": {
+          "id": "RUDDR-018",
+          "slug": "atlas-media",
+          "display_name": "Atlas Media Group"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "corporate_hierarchy"
+      ],
+      "confidence": 0.87
+    },
+    {
+      "canonical_id": "CAN-019",
+      "canonical_name": "Stratos Cloud",
+      "entity_type": "vendor",
+      "entity_category": "organization",
+      "pattern": "rebrand-alias",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-019",
+          "display_name": "CloudNine Infrastructure Ltd."
+        },
+        "ruddr": {
+          "id": "RUDDR-019",
+          "slug": "stratos-cloud",
+          "display_name": "Stratos Cloud"
+        }
+      },
+      "match_signals": [
+        "alias_table",
+        "manual_override"
+      ],
+      "confidence": 0.86
+    },
+    {
+      "canonical_id": "CAN-020",
+      "canonical_name": "Robert Chen",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "nickname",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-020",
+          "display_name": "Robert Chen"
+        },
+        "ruddr": {
+          "id": "RUDDR-020",
+          "slug": "bob-chen",
+          "display_name": "Bob Chen"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "nickname_table"
+      ],
+      "confidence": 0.8
+    },
+    {
+      "canonical_id": "CAN-021",
+      "canonical_name": "Sarah J. Martinez",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "middle-initial",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-021",
+          "display_name": "Sarah J. Martinez"
+        },
+        "ruddr": {
+          "id": "RUDDR-021",
+          "slug": "sarah-martinez",
+          "display_name": "Sarah Martinez"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "initial_expansion"
+      ],
+      "confidence": 0.98
+    },
+    {
+      "canonical_id": "CAN-022",
+      "canonical_name": "Marcus Williams",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "suffix-inconsistent",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-022",
+          "display_name": "Marcus Williams Jr."
+        },
+        "ruddr": {
+          "id": "RUDDR-022",
+          "slug": "marcus-williams",
+          "display_name": "Marcus Williams"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "suffix_strip"
+      ],
+      "confidence": 0.96
+    },
+    {
+      "canonical_id": "CAN-023",
+      "canonical_name": "Jennifer Park-Nakamura",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "maiden-married",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-023",
+          "display_name": "Jennifer Park"
+        },
+        "ruddr": {
+          "id": "RUDDR-023",
+          "slug": "jennifer-nakamura",
+          "display_name": "Jennifer Nakamura"
+        }
+      },
+      "match_signals": [
+        "email_domain_match",
+        "manual_override"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "canonical_id": "CAN-024",
+      "canonical_name": "David Thompson",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "first-initial",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-024",
+          "display_name": "David Thompson"
+        },
+        "ruddr": {
+          "id": "RUDDR-024",
+          "slug": "d-thompson",
+          "display_name": "D. Thompson"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "initial_expansion"
+      ],
+      "confidence": 0.98
+    },
+    {
+      "canonical_id": "CAN-025",
+      "canonical_name": "Lisa Hernandez-Garcia",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "hyphenated-partial",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-025",
+          "display_name": "Lisa Hernandez-Garcia"
+        },
+        "ruddr": {
+          "id": "RUDDR-025",
+          "slug": "lisa-garcia",
+          "display_name": "Lisa Garcia"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "hyphen_split"
+      ],
+      "confidence": 0.99
+    },
+    {
+      "canonical_id": "CAN-026",
+      "canonical_name": "Michael Chen",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "name-order",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-026",
+          "display_name": "Chen, Michael"
+        },
+        "ruddr": {
+          "id": "RUDDR-026",
+          "slug": "michael-chen",
+          "display_name": "Michael Chen"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "token_sort"
+      ],
+      "confidence": 0.92
+    },
+    {
+      "canonical_id": "CAN-027",
+      "canonical_name": "André Dubois",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "accent-drop",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-027",
+          "display_name": "André Dubois"
+        },
+        "ruddr": {
+          "id": "RUDDR-027",
+          "slug": "andre-dubois",
+          "display_name": "Andre Dubois"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "unicode_normalize"
+      ],
+      "confidence": 0.84
+    },
+    {
+      "canonical_id": "CAN-028",
+      "canonical_name": "Wei Chen",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "nickname",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-028",
+          "display_name": "Wei Chen"
+        },
+        "ruddr": {
+          "id": "RUDDR-028",
+          "slug": "william-chen",
+          "display_name": "William Chen"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "nickname_table"
+      ],
+      "confidence": 0.79
+    },
+    {
+      "canonical_id": "CAN-029",
+      "canonical_name": "Tyler R. Johnson",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "middle-initial",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-029",
+          "display_name": "Tyler R. Johnson"
+        },
+        "ruddr": {
+          "id": "RUDDR-029",
+          "slug": "tyler-johnson",
+          "display_name": "Tyler Johnson"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "initial_expansion"
+      ],
+      "confidence": 0.94
+    },
+    {
+      "canonical_id": "CAN-030",
+      "canonical_name": "Amanda Johnson",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "first-initial",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-030",
+          "display_name": "Amanda Johnson"
+        },
+        "ruddr": {
+          "id": "RUDDR-030",
+          "slug": "a-johnson",
+          "display_name": "A. Johnson"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "initial_expansion"
+      ],
+      "confidence": 0.88
+    },
+    {
+      "canonical_id": "CAN-031",
+      "canonical_name": "Denise Williams",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "name-order",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-031",
+          "display_name": "Williams, Denise"
+        },
+        "ruddr": {
+          "id": "RUDDR-031",
+          "slug": "denise-williams",
+          "display_name": "Denise Williams"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "token_sort"
+      ],
+      "confidence": 0.92
+    },
+    {
+      "canonical_id": "CAN-032",
+      "canonical_name": "James Whitfield III",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "suffix-inconsistent",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-032",
+          "display_name": "James Whitfield III"
+        },
+        "ruddr": {
+          "id": "RUDDR-032",
+          "slug": "james-whitfield",
+          "display_name": "James Whitfield"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "suffix_strip"
+      ],
+      "confidence": 0.97
+    },
+    {
+      "canonical_id": "CAN-033",
+      "canonical_name": "Rachel Kim-Okonkwo",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "maiden-married",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-033",
+          "display_name": "Rachel Kim"
+        },
+        "ruddr": {
+          "id": "RUDDR-033",
+          "slug": "rachel-okonkwo",
+          "display_name": "Rachel Okonkwo"
+        }
+      },
+      "match_signals": [
+        "email_domain_match",
+        "manual_override"
+      ],
+      "confidence": 0.82
+    },
+    {
+      "canonical_id": "CAN-034",
+      "canonical_name": "Carlos Ruiz-Fernandez",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "hyphenated-partial",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-034",
+          "display_name": "Carlos Ruiz-Fernandez"
+        },
+        "ruddr": {
+          "id": "RUDDR-034",
+          "slug": "carlos-fernandez",
+          "display_name": "Carlos Fernandez"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "hyphen_split"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "canonical_id": "CAN-035",
+      "canonical_name": "José Álvarez",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "accent-drop",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-035",
+          "display_name": "José Álvarez"
+        },
+        "ruddr": {
+          "id": "RUDDR-035",
+          "slug": "jose-alvarez",
+          "display_name": "Jose Alvarez"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "unicode_normalize"
+      ],
+      "confidence": 0.91
+    },
+    {
+      "canonical_id": "CAN-036",
+      "canonical_name": "Katherine Ellis",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "nickname",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-036",
+          "display_name": "Katherine Ellis"
+        },
+        "ruddr": {
+          "id": "RUDDR-036",
+          "slug": "kate-ellis",
+          "display_name": "Kate Ellis"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "nickname_table"
+      ],
+      "confidence": 0.88
+    },
+    {
+      "canonical_id": "CAN-037",
+      "canonical_name": "Brian M. Patel",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "middle-initial",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-037",
+          "display_name": "Brian M. Patel"
+        },
+        "ruddr": {
+          "id": "RUDDR-037",
+          "slug": "brian-patel",
+          "display_name": "Brian Patel"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "initial_expansion"
+      ],
+      "confidence": 0.8
+    },
+    {
+      "canonical_id": "CAN-038",
+      "canonical_name": "Samantha Cruz",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "first-initial",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-038",
+          "display_name": "Samantha Cruz"
+        },
+        "ruddr": {
+          "id": "RUDDR-038",
+          "slug": "s-cruz",
+          "display_name": "S. Cruz"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "initial_expansion"
+      ],
+      "confidence": 0.85
+    },
+    {
+      "canonical_id": "CAN-039",
+      "canonical_name": "Nathan Brooks",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "name-order",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-039",
+          "display_name": "Brooks, Nathan"
+        },
+        "ruddr": {
+          "id": "RUDDR-039",
+          "slug": "nathan-brooks",
+          "display_name": "Nathan Brooks"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "token_sort"
+      ],
+      "confidence": 0.85
+    },
+    {
+      "canonical_id": "CAN-040",
+      "canonical_name": "William Torres",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "nickname",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-040",
+          "display_name": "William Torres"
+        },
+        "ruddr": {
+          "id": "RUDDR-040",
+          "slug": "will-torres",
+          "display_name": "Will Torres"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "nickname_table"
+      ],
+      "confidence": 0.92
+    },
+    {
+      "canonical_id": "CAN-041",
+      "canonical_name": "Franklin Moore Sr.",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "suffix-inconsistent",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-041",
+          "display_name": "Franklin Moore Sr."
+        },
+        "ruddr": {
+          "id": "RUDDR-041",
+          "slug": "franklin-moore",
+          "display_name": "Franklin Moore"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "suffix_strip"
+      ],
+      "confidence": 0.96
+    },
+    {
+      "canonical_id": "CAN-042",
+      "canonical_name": "Emily Sato-Rivera",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "maiden-married",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-042",
+          "display_name": "Emily Sato"
+        },
+        "ruddr": {
+          "id": "RUDDR-042",
+          "slug": "emily-rivera",
+          "display_name": "Emily Rivera"
+        }
+      },
+      "match_signals": [
+        "email_domain_match",
+        "manual_override"
+      ],
+      "confidence": 0.85
+    },
+    {
+      "canonical_id": "CAN-043",
+      "canonical_name": "Priya Sharma-Gupta",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "hyphenated-partial",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-043",
+          "display_name": "Priya Sharma-Gupta"
+        },
+        "ruddr": {
+          "id": "RUDDR-043",
+          "slug": "priya-gupta",
+          "display_name": "Priya Gupta"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "hyphen_split"
+      ],
+      "confidence": 0.93
+    },
+    {
+      "canonical_id": "CAN-044",
+      "canonical_name": "François Lefèvre",
+      "entity_type": "employee",
+      "entity_category": "person",
+      "pattern": "accent-drop",
+      "sources": {
+        "quickbooks": {
+          "id": "QB-044",
+          "display_name": "François Lefèvre"
+        },
+        "ruddr": {
+          "id": "RUDDR-044",
+          "slug": "francois-lefevre",
+          "display_name": "Francois Lefevre"
+        }
+      },
+      "match_signals": [
+        "name_fuzzy",
+        "unicode_normalize"
+      ],
+      "confidence": 0.84
     }
   ],
   "unmatched": {
-    "quickbooks": [],
+    "quickbooks": [
+      {
+        "id": "QB-045",
+        "display_name": "Thornton & Marsh LLP",
+        "reason": "Outside counsel — not tracked in RUDDR"
+      },
+      {
+        "id": "QB-046",
+        "display_name": "Regency Office Supplies",
+        "reason": "Office vendor — no project work, QB-only"
+      }
+    ],
     "ruddr": [
       {
-        "id": "RUDDR-009",
+        "id": "RUDDR-047",
         "display_name": "Riverstone Capital Advisors",
-        "reason": "No corresponding QB record \u2014 client onboarded in RUDDR only"
+        "reason": "No corresponding QB record — client onboarded in RUDDR only"
       }
     ]
   }

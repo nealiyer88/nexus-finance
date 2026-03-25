@@ -2,280 +2,1024 @@
   {
     "id": "RUDDR-001",
     "source": "ruddr",
+    "entity_category": "organization",
     "slug": "cenlar-fsb",
     "display_name": "Cenlar FSB",
     "type": "client",
     "projects": [
       {
-        "code": "CEN-RSR-SOW1",
-        "name": "Lending Platform Redesign",
-        "status": "completed",
-        "budget_hours": 400,
-        "logged_hours": 251.0,
-        "hourly_rate": 244.79
+        "code": "CEN-GP-SOW1",
+        "name": "Customer 360 Platform",
+        "status": "active",
+        "budget_hours": 300,
+        "logged_hours": 57.0,
+        "hourly_rate": 232.22,
+        "department": "Data Engineering"
       },
       {
-        "code": "CEN-MHY-SOW2",
+        "code": "CEN-PVA-SOW2",
         "name": "Executive Dashboard",
-        "status": "active",
+        "status": "completed",
         "budget_hours": 1200,
-        "logged_hours": 289.4,
-        "hourly_rate": 179.78
+        "logged_hours": 507.3,
+        "hourly_rate": 219.02,
+        "department": "Data Engineering"
       }
     ],
     "tags": [
       "financial-services",
-      "enterprise"
+      "startup"
     ],
-    "created_at": "2024-06-10T00:00:00+00:00",
-    "last_activity": "2025-07-25T00:00:00+00:00"
+    "created_at": "2024-03-20T00:00:00+00:00",
+    "last_activity": "2025-04-21T00:00:00+00:00"
   },
   {
     "id": "RUDDR-002",
     "source": "ruddr",
+    "entity_category": "organization",
     "slug": "meridian-cap",
     "display_name": "Meridian Capital",
     "type": "client",
     "projects": [
       {
-        "code": "MER-FY-SOW1",
-        "name": "EMR Interoperability",
-        "status": "active",
-        "budget_hours": 800,
-        "logged_hours": 201.0,
-        "hourly_rate": 265.01
+        "code": "MER-CHQ-SOW1",
+        "name": "Cloud Cost Optimization",
+        "status": "completed",
+        "budget_hours": 1200,
+        "logged_hours": 186.1,
+        "hourly_rate": 289.81,
+        "department": "Strategy & Advisory"
       },
       {
-        "code": "MER-DDTOT-SOW2",
-        "name": "BI Platform Phase 2",
+        "code": "MER-UZ-SOW2",
+        "name": "EMR Interoperability",
         "status": "active",
-        "budget_hours": 900,
-        "logged_hours": 772.7,
-        "hourly_rate": 178.51
+        "budget_hours": 400,
+        "logged_hours": 65.1,
+        "hourly_rate": 294.5,
+        "department": "Strategy & Advisory"
       }
     ],
     "tags": [
       "financial-services",
-      "mid-market"
+      "boutique"
     ],
-    "created_at": "2024-09-17T00:00:00+00:00",
-    "last_activity": "2025-09-10T00:00:00+00:00"
+    "created_at": "2024-11-21T00:00:00+00:00",
+    "last_activity": "2025-07-06T00:00:00+00:00"
   },
   {
     "id": "RUDDR-003",
     "source": "ruddr",
+    "entity_category": "organization",
     "slug": "techventures-io",
     "display_name": "TechVentures",
     "type": "client",
     "projects": [
       {
-        "code": "TEC-WD-SOW1",
-        "name": "BI Platform Phase 2",
+        "code": "TEC-HYR-SOW1",
+        "name": "EMR Interoperability",
         "status": "completed",
-        "budget_hours": 500,
-        "logged_hours": 386.6,
-        "hourly_rate": 158.26
+        "budget_hours": 600,
+        "logged_hours": 135.0,
+        "hourly_rate": 189.59,
+        "department": "Software Development"
+      },
+      {
+        "code": "TEC-UK-SOW2",
+        "name": "Lending Platform Redesign",
+        "status": "active",
+        "budget_hours": 300,
+        "logged_hours": 103.8,
+        "hourly_rate": 216.09,
+        "department": "Software Development"
+      },
+      {
+        "code": "TEC-FMX-SOW3",
+        "name": "Predictive Analytics MVP",
+        "status": "active",
+        "budget_hours": 2000,
+        "logged_hours": 1671.3,
+        "hourly_rate": 186.92,
+        "department": "Software Development"
       }
     ],
     "tags": [
       "technology",
+      "mid-market"
+    ],
+    "created_at": "2024-10-14T00:00:00+00:00",
+    "last_activity": "2025-10-03T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-004",
+    "source": "ruddr",
+    "entity_category": "organization",
+    "slug": "apex-log",
+    "display_name": "Apex Logistics",
+    "type": "client",
+    "projects": [
+      {
+        "code": "APE-QU-SOW1",
+        "name": "Mobile App Rewrite",
+        "status": "completed",
+        "budget_hours": 300,
+        "logged_hours": 252.4,
+        "hourly_rate": 192.54,
+        "department": "Cloud & Infrastructure"
+      }
+    ],
+    "tags": [
+      "logistics",
       "boutique"
     ],
     "created_at": "2024-11-01T00:00:00+00:00",
     "last_activity": "2025-08-28T00:00:00+00:00"
   },
   {
-    "id": "RUDDR-004",
+    "id": "RUDDR-005",
     "source": "ruddr",
-    "slug": "apex-log",
-    "display_name": "Apex Logistics",
+    "entity_category": "organization",
+    "slug": "summit-partners",
+    "display_name": "Summit Partners",
     "type": "client",
     "projects": [
       {
-        "code": "APE-ZWAS-SOW1",
-        "name": "CRM Migration",
-        "status": "active",
-        "budget_hours": 1200,
-        "logged_hours": 868.5,
-        "hourly_rate": 164.5
-      },
-      {
-        "code": "APE-EASSZ-SOW2",
-        "name": "Data Migration",
+        "code": "SUM-YW-SOW1",
+        "name": "Portfolio Analytics Tool",
         "status": "completed",
-        "budget_hours": 500,
-        "logged_hours": 265.8,
-        "hourly_rate": 188.8
+        "budget_hours": 900,
+        "logged_hours": 177.3,
+        "hourly_rate": 304.05,
+        "department": "Strategy & Advisory"
       },
       {
-        "code": "APE-DTO-SOW3",
-        "name": "Staff Augmentation",
-        "status": "active",
+        "code": "SUM-HQPD-SOW2",
+        "name": "Executive Dashboard",
+        "status": "completed",
         "budget_hours": 1200,
-        "logged_hours": 1051.2,
-        "hourly_rate": 213.52
+        "logged_hours": 1044.8,
+        "hourly_rate": 308.84,
+        "department": "Strategy & Advisory"
       }
     ],
     "tags": [
-      "logistics",
+      "financial-services",
       "enterprise"
     ],
-    "created_at": "2024-07-04T00:00:00+00:00",
-    "last_activity": "2025-06-07T00:00:00+00:00"
+    "created_at": "2024-11-02T00:00:00+00:00",
+    "last_activity": "2025-06-15T00:00:00+00:00"
   },
   {
-    "id": "RUDDR-005",
+    "id": "RUDDR-006",
     "source": "ruddr",
+    "entity_category": "organization",
     "slug": "greenfield-analytics",
     "display_name": "Greenfield Analytics",
     "type": "client",
     "projects": [
       {
-        "code": "GRE-GO-SOW1",
-        "name": "EMR Interoperability",
+        "code": "GRE-ZN-SOW1",
+        "name": "ERP Integration",
         "status": "active",
         "budget_hours": 400,
-        "logged_hours": 78.3,
-        "hourly_rate": 277.14
+        "logged_hours": 291.5,
+        "hourly_rate": 229.69,
+        "department": "Data Engineering"
       }
     ],
     "tags": [
       "analytics",
       "mid-market"
     ],
-    "created_at": "2024-03-06T00:00:00+00:00",
-    "last_activity": "2025-12-04T00:00:00+00:00"
+    "created_at": "2024-05-15T00:00:00+00:00",
+    "last_activity": "2025-09-28T00:00:00+00:00"
   },
   {
-    "id": "RUDDR-006",
+    "id": "RUDDR-007",
     "source": "ruddr",
+    "entity_category": "organization",
     "slug": "northstar-health",
     "display_name": "NorthStar Health",
     "type": "client",
     "projects": [
       {
-        "code": "NOR-GWL-SOW1",
-        "name": "MLOps Infrastructure",
-        "status": "completed",
-        "budget_hours": 600,
-        "logged_hours": 533.0,
-        "hourly_rate": 190.52
+        "code": "NOR-DFI-SOW1",
+        "name": "Customer 360 Platform",
+        "status": "active",
+        "budget_hours": 1000,
+        "logged_hours": 859.7,
+        "hourly_rate": 201.48,
+        "department": "Software Development"
       },
       {
-        "code": "NOR-LNDF-SOW2",
-        "name": "Portfolio Analytics Tool",
+        "code": "NOR-BBAI-SOW2",
+        "name": "Data Warehouse Migration",
         "status": "active",
-        "budget_hours": 800,
-        "logged_hours": 64.9,
-        "hourly_rate": 226.5
+        "budget_hours": 300,
+        "logged_hours": 66.7,
+        "hourly_rate": 187.53,
+        "department": "Software Development"
       }
     ],
     "tags": [
       "healthcare",
-      "enterprise"
+      "boutique"
     ],
-    "created_at": "2024-02-06T00:00:00+00:00",
-    "last_activity": "2025-12-29T00:00:00+00:00"
-  },
-  {
-    "id": "RUDDR-007",
-    "source": "ruddr",
-    "slug": "summit-partners",
-    "display_name": "Summit Partners",
-    "type": "client",
-    "projects": [
-      {
-        "code": "SUM-FX-SOW1",
-        "name": "MLOps Infrastructure",
-        "status": "active",
-        "budget_hours": 800,
-        "logged_hours": 100.3,
-        "hourly_rate": 236.97
-      },
-      {
-        "code": "SUM-OSW-SOW2",
-        "name": "EMR Interoperability",
-        "status": "active",
-        "budget_hours": 2000,
-        "logged_hours": 924.4,
-        "hourly_rate": 174.75
-      },
-      {
-        "code": "SUM-RJ-SOW3",
-        "name": "GenAI Platform Build",
-        "status": "completed",
-        "budget_hours": 900,
-        "logged_hours": 426.0,
-        "hourly_rate": 234.95
-      }
-    ],
-    "tags": [
-      "financial-services",
-      "enterprise"
-    ],
-    "created_at": "2024-02-01T00:00:00+00:00",
-    "last_activity": "2025-07-26T00:00:00+00:00"
+    "created_at": "2024-04-19T00:00:00+00:00",
+    "last_activity": "2025-10-04T00:00:00+00:00"
   },
   {
     "id": "RUDDR-008",
     "source": "ruddr",
+    "entity_category": "organization",
     "slug": "databridge-sol",
     "display_name": "DataBridge",
     "type": "vendor",
     "projects": [
       {
-        "code": "DAT-UCEN-SOW1",
+        "code": "DAT-WBQ-SOW1",
+        "name": "MLOps Infrastructure",
+        "status": "active",
+        "budget_hours": 800,
+        "logged_hours": 350.7,
+        "hourly_rate": 193.12,
+        "department": "Software Development"
+      },
+      {
+        "code": "DAT-GE-SOW2",
+        "name": "Predictive Analytics MVP",
+        "status": "active",
+        "budget_hours": 800,
+        "logged_hours": 618.4,
+        "hourly_rate": 193.98,
+        "department": "Software Development"
+      }
+    ],
+    "tags": [
+      "technology",
+      "startup"
+    ],
+    "created_at": "2024-08-24T00:00:00+00:00",
+    "last_activity": "2025-05-08T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-009",
+    "source": "ruddr",
+    "entity_category": "organization",
+    "slug": "vanguard-digital",
+    "display_name": "Vanguard Digital Labs",
+    "type": "client",
+    "projects": [
+      {
+        "code": "VAN-XEA-SOW1",
+        "name": "Zero Trust Implementation",
+        "status": "active",
+        "budget_hours": 1000,
+        "logged_hours": 242.4,
+        "hourly_rate": 227.06,
+        "department": "Cloud & Infrastructure"
+      },
+      {
+        "code": "VAN-YZOS-SOW2",
         "name": "ERP Integration",
         "status": "active",
-        "budget_hours": 500,
-        "logged_hours": 229.3,
-        "hourly_rate": 182.47
-      },
-      {
-        "code": "DAT-LW-SOW2",
-        "name": "CRM Migration",
-        "status": "completed",
-        "budget_hours": 1200,
-        "logged_hours": 156.7,
-        "hourly_rate": 258.68
-      },
-      {
-        "code": "DAT-YW-SOW3",
-        "name": "EMR Interoperability",
-        "status": "active",
-        "budget_hours": 500,
-        "logged_hours": 222.7,
-        "hourly_rate": 262.4
+        "budget_hours": 1000,
+        "logged_hours": 306.7,
+        "hourly_rate": 201.87,
+        "department": "Cloud & Infrastructure"
       }
     ],
     "tags": [
       "technology",
       "enterprise"
     ],
-    "created_at": "2024-03-25T00:00:00+00:00",
-    "last_activity": "2025-07-14T00:00:00+00:00"
+    "created_at": "2024-10-23T00:00:00+00:00",
+    "last_activity": "2025-10-05T00:00:00+00:00"
   },
   {
-    "id": "RUDDR-009",
+    "id": "RUDDR-010",
     "source": "ruddr",
+    "entity_category": "organization",
+    "slug": "beck-howell",
+    "display_name": "Beck and Howell Consulting",
+    "type": "client",
+    "projects": [
+      {
+        "code": "BEC-PR-SOW1",
+        "name": "EMR Interoperability",
+        "status": "active",
+        "budget_hours": 400,
+        "logged_hours": 330.9,
+        "hourly_rate": 288.0,
+        "department": "Strategy & Advisory"
+      },
+      {
+        "code": "BEC-BCRO-SOW2",
+        "name": "CRM Migration",
+        "status": "active",
+        "budget_hours": 2000,
+        "logged_hours": 505.5,
+        "hourly_rate": 290.11,
+        "department": "Strategy & Advisory"
+      },
+      {
+        "code": "BEC-DQL-SOW3",
+        "name": "Lending Platform Redesign",
+        "status": "active",
+        "budget_hours": 800,
+        "logged_hours": 219.5,
+        "hourly_rate": 296.46,
+        "department": "Strategy & Advisory"
+      }
+    ],
+    "tags": [
+      "consulting",
+      "enterprise"
+    ],
+    "created_at": "2024-02-07T00:00:00+00:00",
+    "last_activity": "2025-10-03T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-011",
+    "source": "ruddr",
+    "entity_category": "organization",
+    "slug": "briarwood-group",
+    "display_name": "Briarwood Group",
+    "type": "client",
+    "projects": [
+      {
+        "code": "BRI-ZUNR-SOW1",
+        "name": "Customer 360 Platform",
+        "status": "active",
+        "budget_hours": 1200,
+        "logged_hours": 816.9,
+        "hourly_rate": 182.61,
+        "department": "Design & UX"
+      },
+      {
+        "code": "BRI-GX-SOW2",
+        "name": "Customer 360 Platform",
+        "status": "active",
+        "budget_hours": 400,
+        "logged_hours": 359.8,
+        "hourly_rate": 159.53,
+        "department": "Design & UX"
+      }
+    ],
+    "tags": [
+      "real-estate",
+      "mid-market"
+    ],
+    "created_at": "2024-06-24T00:00:00+00:00",
+    "last_activity": "2025-04-15T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-012",
+    "source": "ruddr",
+    "entity_category": "organization",
+    "slug": "pinnacle-eng",
+    "display_name": "Pinnacle Engineering",
+    "type": "client",
+    "projects": [
+      {
+        "code": "PIN-QG-SOW1",
+        "name": "Predictive Analytics MVP",
+        "status": "completed",
+        "budget_hours": 300,
+        "logged_hours": 128.4,
+        "hourly_rate": 218.23,
+        "department": "Cloud & Infrastructure"
+      }
+    ],
+    "tags": [
+      "engineering",
+      "enterprise"
+    ],
+    "created_at": "2024-02-27T00:00:00+00:00",
+    "last_activity": "2025-02-08T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-013",
+    "source": "ruddr",
+    "entity_category": "organization",
+    "slug": "luminos-ai",
+    "display_name": "Luminos AI",
+    "type": "client",
+    "projects": [
+      {
+        "code": "LUM-XF-SOW1",
+        "name": "EMR Interoperability",
+        "status": "completed",
+        "budget_hours": 800,
+        "logged_hours": 688.3,
+        "hourly_rate": 204.63,
+        "department": "Data Engineering"
+      },
+      {
+        "code": "LUM-ZTY-SOW2",
+        "name": "EMR Interoperability",
+        "status": "active",
+        "budget_hours": 1200,
+        "logged_hours": 1013.7,
+        "hourly_rate": 243.93,
+        "department": "Data Engineering"
+      }
+    ],
+    "tags": [
+      "artificial-intelligence",
+      "mid-market"
+    ],
+    "created_at": "2024-07-30T00:00:00+00:00",
+    "last_activity": "2025-01-13T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-014",
+    "source": "ruddr",
+    "entity_category": "organization",
+    "slug": "hargrove-fin",
+    "display_name": "Hargrove Financial",
+    "type": "client",
+    "projects": [
+      {
+        "code": "HAR-FX-SOW1",
+        "name": "Cloud Cost Optimization",
+        "status": "active",
+        "budget_hours": 300,
+        "logged_hours": 251.8,
+        "hourly_rate": 305.51,
+        "department": "Strategy & Advisory"
+      },
+      {
+        "code": "HAR-FIWZ-SOW2",
+        "name": "Portfolio Analytics Tool",
+        "status": "active",
+        "budget_hours": 600,
+        "logged_hours": 165.9,
+        "hourly_rate": 301.04,
+        "department": "Strategy & Advisory"
+      }
+    ],
+    "tags": [
+      "financial-services",
+      "boutique"
+    ],
+    "created_at": "2024-12-13T00:00:00+00:00",
+    "last_activity": "2025-10-02T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-015",
+    "source": "ruddr",
+    "entity_category": "organization",
+    "slug": "pacrim-tech",
+    "display_name": "PacRim Tech",
+    "type": "client",
+    "projects": [
+      {
+        "code": "PAC-LZD-SOW1",
+        "name": "BI Platform Phase 2",
+        "status": "active",
+        "budget_hours": 900,
+        "logged_hours": 328.3,
+        "hourly_rate": 177.0,
+        "department": "Software Development"
+      },
+      {
+        "code": "PAC-RYTF-SOW2",
+        "name": "Mobile App Rewrite",
+        "status": "active",
+        "budget_hours": 900,
+        "logged_hours": 51.4,
+        "hourly_rate": 217.7,
+        "department": "Software Development"
+      },
+      {
+        "code": "PAC-WSHI-SOW3",
+        "name": "Mobile App Rewrite",
+        "status": "active",
+        "budget_hours": 800,
+        "logged_hours": 492.4,
+        "hourly_rate": 193.11,
+        "department": "Software Development"
+      }
+    ],
+    "tags": [
+      "technology",
+      "startup"
+    ],
+    "created_at": "2024-10-10T00:00:00+00:00",
+    "last_activity": "2025-03-07T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-016",
+    "source": "ruddr",
+    "entity_category": "organization",
+    "slug": "calloway-reed",
+    "display_name": "Calloway Reed Partners",
+    "type": "client",
+    "projects": [
+      {
+        "code": "CAL-LP-SOW1",
+        "name": "CRM Migration",
+        "status": "active",
+        "budget_hours": 300,
+        "logged_hours": 121.4,
+        "hourly_rate": 94.88,
+        "department": "Staff Augmentation"
+      },
+      {
+        "code": "CAL-ECNQ-SOW2",
+        "name": "CRM Migration",
+        "status": "active",
+        "budget_hours": 600,
+        "logged_hours": 315.8,
+        "hourly_rate": 111.83,
+        "department": "Staff Augmentation"
+      },
+      {
+        "code": "CAL-UD-SOW3",
+        "name": "Data Migration",
+        "status": "active",
+        "budget_hours": 600,
+        "logged_hours": 399.9,
+        "hourly_rate": 119.28,
+        "department": "Staff Augmentation"
+      }
+    ],
+    "tags": [
+      "consulting",
+      "enterprise"
+    ],
+    "created_at": "2024-08-21T00:00:00+00:00",
+    "last_activity": "2025-08-01T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-017",
+    "source": "ruddr",
+    "entity_category": "organization",
+    "slug": "ironclad-sec",
+    "display_name": "Ironclad Security",
+    "type": "vendor",
+    "projects": [
+      {
+        "code": "IRO-NBGW-SOW1",
+        "name": "Predictive Analytics MVP",
+        "status": "active",
+        "budget_hours": 600,
+        "logged_hours": 141.5,
+        "hourly_rate": 222.06,
+        "department": "Cloud & Infrastructure"
+      },
+      {
+        "code": "IRO-ITLV-SOW2",
+        "name": "Data Warehouse Migration",
+        "status": "active",
+        "budget_hours": 1200,
+        "logged_hours": 1126.8,
+        "hourly_rate": 223.22,
+        "department": "Cloud & Infrastructure"
+      }
+    ],
+    "tags": [
+      "cybersecurity",
+      "boutique"
+    ],
+    "created_at": "2024-03-22T00:00:00+00:00",
+    "last_activity": "2025-09-01T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-018",
+    "source": "ruddr",
+    "entity_category": "organization",
+    "slug": "atlas-media",
+    "display_name": "Atlas Media Group",
+    "type": "client",
+    "projects": [
+      {
+        "code": "ATL-HI-SOW1",
+        "name": "Customer 360 Platform",
+        "status": "active",
+        "budget_hours": 400,
+        "logged_hours": 285.5,
+        "hourly_rate": 154.84,
+        "department": "Design & UX"
+      },
+      {
+        "code": "ATL-SB-SOW2",
+        "name": "Mobile App Rewrite",
+        "status": "active",
+        "budget_hours": 600,
+        "logged_hours": 249.2,
+        "hourly_rate": 168.99,
+        "department": "Design & UX"
+      }
+    ],
+    "tags": [
+      "media",
+      "boutique"
+    ],
+    "created_at": "2024-02-01T00:00:00+00:00",
+    "last_activity": "2025-04-16T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-019",
+    "source": "ruddr",
+    "entity_category": "organization",
+    "slug": "stratos-cloud",
+    "display_name": "Stratos Cloud",
+    "type": "vendor",
+    "projects": [
+      {
+        "code": "STR-NTU-SOW1",
+        "name": "EMR Interoperability",
+        "status": "active",
+        "budget_hours": 900,
+        "logged_hours": 737.0,
+        "hourly_rate": 198.78,
+        "department": "Cloud & Infrastructure"
+      },
+      {
+        "code": "STR-IRK-SOW2",
+        "name": "Executive Dashboard",
+        "status": "active",
+        "budget_hours": 900,
+        "logged_hours": 440.9,
+        "hourly_rate": 226.78,
+        "department": "Cloud & Infrastructure"
+      }
+    ],
+    "tags": [
+      "cloud-services",
+      "enterprise"
+    ],
+    "created_at": "2024-07-20T00:00:00+00:00",
+    "last_activity": "2025-10-31T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-020",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "bob-chen",
+    "display_name": "Bob Chen",
+    "type": "team-member",
+    "email": "bob.chen@clientcorp.com",
+    "department": "Strategy & Advisory",
+    "hourly_rate": 306.67,
+    "created_at": "2024-04-03T00:00:00+00:00",
+    "last_activity": "2025-01-26T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-021",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "sarah-martinez",
+    "display_name": "Sarah Martinez",
+    "type": "team-member",
+    "email": "sarah.martinez@clientcorp.com",
+    "department": "Data Engineering",
+    "hourly_rate": 215.19,
+    "created_at": "2024-07-13T00:00:00+00:00",
+    "last_activity": "2025-05-23T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-022",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "marcus-williams",
+    "display_name": "Marcus Williams",
+    "type": "team-member",
+    "email": "marcus.williams@clientcorp.com",
+    "department": "Software Development",
+    "hourly_rate": 175.87,
+    "created_at": "2024-10-03T00:00:00+00:00",
+    "last_activity": "2025-01-27T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-023",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "jennifer-nakamura",
+    "display_name": "Jennifer Nakamura",
+    "type": "team-member",
+    "email": "jnakamura@clientcorp.com",
+    "department": "Design & UX",
+    "hourly_rate": 176.4,
+    "created_at": "2024-05-06T00:00:00+00:00",
+    "last_activity": "2025-04-13T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-024",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "d-thompson",
+    "display_name": "D. Thompson",
+    "type": "team-member",
+    "email": "dthompson@clientcorp.com",
+    "department": "Cloud & Infrastructure",
+    "hourly_rate": 194.58,
+    "created_at": "2024-04-21T00:00:00+00:00",
+    "last_activity": "2025-08-27T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-025",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "lisa-garcia",
+    "display_name": "Lisa Garcia",
+    "type": "team-member",
+    "email": "lisa.garcia@clientcorp.com",
+    "department": "Data Engineering",
+    "hourly_rate": 227.33,
+    "created_at": "2024-02-28T00:00:00+00:00",
+    "last_activity": "2025-03-25T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-026",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "michael-chen",
+    "display_name": "Michael Chen",
+    "type": "team-member",
+    "email": "michael.chen@clientcorp.com",
+    "department": "Software Development",
+    "hourly_rate": 205.48,
+    "created_at": "2024-07-11T00:00:00+00:00",
+    "last_activity": "2025-07-23T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-027",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "andre-dubois",
+    "display_name": "Andre Dubois",
+    "type": "team-member",
+    "email": "andre.dubois@clientcorp.com",
+    "department": "Strategy & Advisory",
+    "hourly_rate": 291.07,
+    "created_at": "2024-12-22T00:00:00+00:00",
+    "last_activity": "2025-06-04T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-028",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "william-chen",
+    "display_name": "William Chen",
+    "type": "team-member",
+    "email": "william.chen@clientcorp.com",
+    "department": "Cloud & Infrastructure",
+    "hourly_rate": 203.89,
+    "created_at": "2024-08-07T00:00:00+00:00",
+    "last_activity": "2025-12-05T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-029",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "tyler-johnson",
+    "display_name": "Tyler Johnson",
+    "type": "team-member",
+    "email": "tyler.johnson@clientcorp.com",
+    "department": "Staff Augmentation",
+    "hourly_rate": 113.23,
+    "created_at": "2024-09-07T00:00:00+00:00",
+    "last_activity": "2025-02-24T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-030",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "a-johnson",
+    "display_name": "A. Johnson",
+    "type": "team-member",
+    "email": "a.johnson@clientcorp.com",
+    "department": "Design & UX",
+    "hourly_rate": 155.35,
+    "created_at": "2024-03-31T00:00:00+00:00",
+    "last_activity": "2025-09-25T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-031",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "denise-williams",
+    "display_name": "Denise Williams",
+    "type": "team-member",
+    "email": "denise.williams@clientcorp.com",
+    "department": "Data Engineering",
+    "hourly_rate": 220.92,
+    "created_at": "2024-10-30T00:00:00+00:00",
+    "last_activity": "2025-05-18T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-032",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "james-whitfield",
+    "display_name": "James Whitfield",
+    "type": "team-member",
+    "email": "james.whitfield@clientcorp.com",
+    "department": "Strategy & Advisory",
+    "hourly_rate": 307.04,
+    "created_at": "2024-05-04T00:00:00+00:00",
+    "last_activity": "2025-08-26T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-033",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "rachel-okonkwo",
+    "display_name": "Rachel Okonkwo",
+    "type": "team-member",
+    "email": "rokonkwo@clientcorp.com",
+    "department": "Software Development",
+    "hourly_rate": 183.18,
+    "created_at": "2024-04-18T00:00:00+00:00",
+    "last_activity": "2025-07-01T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-034",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "carlos-fernandez",
+    "display_name": "Carlos Fernandez",
+    "type": "team-member",
+    "email": "carlos.fernandez@clientcorp.com",
+    "department": "Cloud & Infrastructure",
+    "hourly_rate": 225.2,
+    "created_at": "2024-10-11T00:00:00+00:00",
+    "last_activity": "2025-01-06T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-035",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "jose-alvarez",
+    "display_name": "Jose Alvarez",
+    "type": "team-member",
+    "email": "jose.alvarez@clientcorp.com",
+    "department": "Staff Augmentation",
+    "hourly_rate": 99.98,
+    "created_at": "2024-05-03T00:00:00+00:00",
+    "last_activity": "2025-12-20T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-036",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "kate-ellis",
+    "display_name": "Kate Ellis",
+    "type": "team-member",
+    "email": "kate.ellis@clientcorp.com",
+    "department": "Design & UX",
+    "hourly_rate": 160.3,
+    "created_at": "2024-07-26T00:00:00+00:00",
+    "last_activity": "2025-12-21T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-037",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "brian-patel",
+    "display_name": "Brian Patel",
+    "type": "team-member",
+    "email": "brian.patel@clientcorp.com",
+    "department": "Data Engineering",
+    "hourly_rate": 224.91,
+    "created_at": "2024-06-25T00:00:00+00:00",
+    "last_activity": "2025-08-06T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-038",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "s-cruz",
+    "display_name": "S. Cruz",
+    "type": "team-member",
+    "email": "s.cruz@clientcorp.com",
+    "department": "Software Development",
+    "hourly_rate": 188.8,
+    "created_at": "2024-04-28T00:00:00+00:00",
+    "last_activity": "2025-03-03T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-039",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "nathan-brooks",
+    "display_name": "Nathan Brooks",
+    "type": "team-member",
+    "email": "nathan.brooks@clientcorp.com",
+    "department": "Cloud & Infrastructure",
+    "hourly_rate": 197.41,
+    "created_at": "2024-04-20T00:00:00+00:00",
+    "last_activity": "2025-09-05T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-040",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "will-torres",
+    "display_name": "Will Torres",
+    "type": "team-member",
+    "email": "will.torres@clientcorp.com",
+    "department": "Staff Augmentation",
+    "hourly_rate": 88.33,
+    "created_at": "2024-07-03T00:00:00+00:00",
+    "last_activity": "2025-04-02T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-041",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "franklin-moore",
+    "display_name": "Franklin Moore",
+    "type": "team-member",
+    "email": "franklin.moore@clientcorp.com",
+    "department": "Strategy & Advisory",
+    "hourly_rate": 286.14,
+    "created_at": "2024-01-28T00:00:00+00:00",
+    "last_activity": "2025-10-11T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-042",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "emily-rivera",
+    "display_name": "Emily Rivera",
+    "type": "team-member",
+    "email": "erivera@clientcorp.com",
+    "department": "Design & UX",
+    "hourly_rate": 180.55,
+    "created_at": "2024-10-20T00:00:00+00:00",
+    "last_activity": "2025-05-26T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-043",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "priya-gupta",
+    "display_name": "Priya Gupta",
+    "type": "team-member",
+    "email": "priya.gupta@clientcorp.com",
+    "department": "Data Engineering",
+    "hourly_rate": 211.36,
+    "created_at": "2024-09-01T00:00:00+00:00",
+    "last_activity": "2025-02-28T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-044",
+    "source": "ruddr",
+    "entity_category": "person",
+    "slug": "francois-lefevre",
+    "display_name": "Francois Lefevre",
+    "type": "team-member",
+    "email": "francois.lefevre@clientcorp.com",
+    "department": "Software Development",
+    "hourly_rate": 205.89,
+    "created_at": "2024-03-18T00:00:00+00:00",
+    "last_activity": "2025-03-18T00:00:00+00:00"
+  },
+  {
+    "id": "RUDDR-047",
+    "source": "ruddr",
+    "entity_category": "organization",
     "slug": "riverstone-cap",
     "display_name": "Riverstone Capital Advisors",
     "type": "client",
     "projects": [
       {
-        "code": "RIV-GULKY-SOW1",
-        "name": "EMR Interoperability",
+        "code": "RIV-CTQG-SOW1",
+        "name": "Lending Platform Redesign",
+        "status": "active",
+        "budget_hours": 2000,
+        "logged_hours": 161.4,
+        "hourly_rate": 291.0,
+        "department": "Strategy & Advisory"
+      },
+      {
+        "code": "RIV-KR-SOW2",
+        "name": "API Gateway Modernization",
         "status": "active",
         "budget_hours": 1200,
-        "logged_hours": 771.4,
-        "hourly_rate": 174.69
+        "logged_hours": 131.8,
+        "hourly_rate": 285.82,
+        "department": "Strategy & Advisory"
+      },
+      {
+        "code": "RIV-WBGG-SOW3",
+        "name": "BI Platform Phase 2",
+        "status": "active",
+        "budget_hours": 750,
+        "logged_hours": 518.4,
+        "hourly_rate": 287.87,
+        "department": "Strategy & Advisory"
       }
     ],
     "tags": [
       "financial-services",
       "mid-market"
     ],
-    "created_at": "2024-01-30T00:00:00+00:00",
-    "last_activity": "2025-10-24T00:00:00+00:00"
+    "created_at": "2024-11-27T00:00:00+00:00",
+    "last_activity": "2025-03-18T00:00:00+00:00"
   }
 ]
