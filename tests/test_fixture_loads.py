@@ -44,12 +44,6 @@ def test_fixture_loads_into_sqlite(conn: sqlite3.Connection) -> None:
 
     expected_sys_refs = 0
     for ent in entities:
-        # Map fixture entity_type to schema enum.
-        # Fixture uses "employee" for person entities; map to "person".
-        entity_type = ent["entity_type"]
-        if ent["entity_category"] == "person":
-            entity_type = "person"
-
         conn.execute(
             """
             INSERT INTO canonical_entities (
@@ -60,7 +54,7 @@ def test_fixture_loads_into_sqlite(conn: sqlite3.Connection) -> None:
             (
                 ent["canonical_id"],
                 ent["canonical_name"],
-                entity_type,
+                ent["entity_type"],
                 ent["entity_category"],
                 ent.get("confidence"),
                 ent.get("pattern"),
