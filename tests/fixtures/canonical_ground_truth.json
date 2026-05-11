@@ -475,7 +475,7 @@
     {
       "canonical_id": "CAN-020",
       "canonical_name": "Robert Chen",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "nickname",
       "sources": {
@@ -498,7 +498,7 @@
     {
       "canonical_id": "CAN-021",
       "canonical_name": "Sarah J. Martinez",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "middle-initial",
       "sources": {
@@ -521,7 +521,7 @@
     {
       "canonical_id": "CAN-022",
       "canonical_name": "Marcus Williams",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "suffix-inconsistent",
       "sources": {
@@ -544,7 +544,7 @@
     {
       "canonical_id": "CAN-023",
       "canonical_name": "Jennifer Park-Nakamura",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "maiden-married",
       "sources": {
@@ -567,7 +567,7 @@
     {
       "canonical_id": "CAN-024",
       "canonical_name": "David Thompson",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "first-initial",
       "sources": {
@@ -590,7 +590,7 @@
     {
       "canonical_id": "CAN-025",
       "canonical_name": "Lisa Hernandez-Garcia",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "hyphenated-partial",
       "sources": {
@@ -613,7 +613,7 @@
     {
       "canonical_id": "CAN-026",
       "canonical_name": "Michael Chen",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "name-order",
       "sources": {
@@ -635,14 +635,14 @@
     },
     {
       "canonical_id": "CAN-027",
-      "canonical_name": "André Dubois",
-      "entity_type": "employee",
+      "canonical_name": "Andr\u00e9 Dubois",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "accent-drop",
       "sources": {
         "quickbooks": {
           "id": "QB-027",
-          "display_name": "André Dubois"
+          "display_name": "Andr\u00e9 Dubois"
         },
         "ruddr": {
           "id": "RUDDR-027",
@@ -659,7 +659,7 @@
     {
       "canonical_id": "CAN-028",
       "canonical_name": "Wei Chen",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "nickname",
       "sources": {
@@ -682,7 +682,7 @@
     {
       "canonical_id": "CAN-029",
       "canonical_name": "Tyler R. Johnson",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "middle-initial",
       "sources": {
@@ -705,7 +705,7 @@
     {
       "canonical_id": "CAN-030",
       "canonical_name": "Amanda Johnson",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "first-initial",
       "sources": {
@@ -728,7 +728,7 @@
     {
       "canonical_id": "CAN-031",
       "canonical_name": "Denise Williams",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "name-order",
       "sources": {
@@ -751,7 +751,7 @@
     {
       "canonical_id": "CAN-032",
       "canonical_name": "James Whitfield III",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "suffix-inconsistent",
       "sources": {
@@ -774,7 +774,7 @@
     {
       "canonical_id": "CAN-033",
       "canonical_name": "Rachel Kim-Okonkwo",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "maiden-married",
       "sources": {
@@ -797,7 +797,7 @@
     {
       "canonical_id": "CAN-034",
       "canonical_name": "Carlos Ruiz-Fernandez",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "hyphenated-partial",
       "sources": {
@@ -819,14 +819,14 @@
     },
     {
       "canonical_id": "CAN-035",
-      "canonical_name": "José Álvarez",
-      "entity_type": "employee",
+      "canonical_name": "Jos\u00e9 \u00c1lvarez",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "accent-drop",
       "sources": {
         "quickbooks": {
           "id": "QB-035",
-          "display_name": "José Álvarez"
+          "display_name": "Jos\u00e9 \u00c1lvarez"
         },
         "ruddr": {
           "id": "RUDDR-035",
@@ -843,7 +843,7 @@
     {
       "canonical_id": "CAN-036",
       "canonical_name": "Katherine Ellis",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "nickname",
       "sources": {
@@ -866,7 +866,7 @@
     {
       "canonical_id": "CAN-037",
       "canonical_name": "Brian M. Patel",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "middle-initial",
       "sources": {
@@ -889,7 +889,7 @@
     {
       "canonical_id": "CAN-038",
       "canonical_name": "Samantha Cruz",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "first-initial",
       "sources": {
@@ -912,7 +912,7 @@
     {
       "canonical_id": "CAN-039",
       "canonical_name": "Nathan Brooks",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "name-order",
       "sources": {
@@ -935,7 +935,7 @@
     {
       "canonical_id": "CAN-040",
       "canonical_name": "William Torres",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "nickname",
       "sources": {
@@ -958,7 +958,7 @@
     {
       "canonical_id": "CAN-041",
       "canonical_name": "Franklin Moore Sr.",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "suffix-inconsistent",
       "sources": {
@@ -981,7 +981,7 @@
     {
       "canonical_id": "CAN-042",
       "canonical_name": "Emily Sato-Rivera",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "maiden-married",
       "sources": {
@@ -1004,7 +1004,7 @@
     {
       "canonical_id": "CAN-043",
       "canonical_name": "Priya Sharma-Gupta",
-      "entity_type": "employee",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "hyphenated-partial",
       "sources": {
@@ -1026,14 +1026,14 @@
     },
     {
       "canonical_id": "CAN-044",
-      "canonical_name": "François Lefèvre",
-      "entity_type": "employee",
+      "canonical_name": "Fran\u00e7ois Lef\u00e8vre",
+      "entity_type": "person",
       "entity_category": "person",
       "pattern": "accent-drop",
       "sources": {
         "quickbooks": {
           "id": "QB-044",
-          "display_name": "François Lefèvre"
+          "display_name": "Fran\u00e7ois Lef\u00e8vre"
         },
         "ruddr": {
           "id": "RUDDR-044",
@@ -1053,19 +1053,19 @@
       {
         "id": "QB-045",
         "display_name": "Thornton & Marsh LLP",
-        "reason": "Outside counsel — not tracked in RUDDR"
+        "reason": "Outside counsel \u2014 not tracked in RUDDR"
       },
       {
         "id": "QB-046",
         "display_name": "Regency Office Supplies",
-        "reason": "Office vendor — no project work, QB-only"
+        "reason": "Office vendor \u2014 no project work, QB-only"
       }
     ],
     "ruddr": [
       {
         "id": "RUDDR-047",
         "display_name": "Riverstone Capital Advisors",
-        "reason": "No corresponding QB record — client onboarded in RUDDR only"
+        "reason": "No corresponding QB record \u2014 client onboarded in RUDDR only"
       }
     ]
   }
