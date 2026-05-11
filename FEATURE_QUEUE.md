@@ -7,7 +7,7 @@
 | 1 | features/infrastructure/rules-file-population.md | — | S | SHIPPED |
 | 2 | features/infrastructure/canonical-schema.md | 1 | M | SHIPPED |
 | 3 | features/pipeline/normalizer.md | 1, 2 | M | SHIPPED |
-| 4 | features/infrastructure/connector-base.md | 2, 3 | S | QUEUED |
+| 4 | features/infrastructure/connector-base.md | 2, 3 | S | SHIPPED |
 | 5 | features/connectors/qb-connector.md | 3, 4 | L | QUEUED |
 | 6 | features/connectors/ruddr-connector.md | 3, 4 | L | QUEUED |
 | 7 | features/pipeline/deterministic-blocking.md | 4, 5 or 6 | L | QUEUED |
