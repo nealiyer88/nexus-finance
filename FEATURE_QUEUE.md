@@ -1,5 +1,7 @@
 ## Active Feature Queue
 
+> Pipeline reads this table to determine build order. Status updated as features ship. Dependencies are strict — downstream features cannot start until all dependencies are SHIPPED.
+
 | # | Brief | Depends On | Complexity | Status |
 |---|-------|------------|------------|--------|
 | 1 | features/infrastructure/rules-file-population.md | — | S | SHIPPED |
