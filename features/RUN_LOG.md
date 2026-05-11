@@ -67,3 +67,38 @@
 **Final push status:** features 1 + 2 + 3 all committed locally. Host-side push pending for branches feature/canonical-schema (4b62cb2 + 7eed801) and feature/normalizer (058e495).
 
 **Sandbox health note:** stuck `.git/*.lock` files persisted across all 3 feature runs but the temp-index commit-tree workaround was reliable. HEAD pointer remained on feature/canonical-schema throughout feature 3 work (couldn't switch due to HEAD.lock); commits landed on the correct branch refs via direct ref updates.
+
+---
+
+## Run: 2026-05-10 (auto mode, native git, /nex pipeline)
+
+**Trigger:** Manual (user invoked `/nex` slash command)
+**Pipeline mode:** In-session debate → synthesis → build → verify → commit → merge, native git on host (no sandbox limitation this run)
+**Features attempted:** 3 (connector-base, qb-connector, ruddr-connector)
+**Shipped:** all 3, merged to main locally; push to origin pending user authorization
+**Blocked:** none
+**Test count delta:** 124 → 170 (+46 new tests)
+
+### connector-base (feature 4, branch feature/connector-base, commit 7e92d82)
+- Debate: NormalizedEntity already exists in core.ingestion.normalizer; re-export rather than redefine to keep one source of truth (Architect's call). Category enforced via `__init_subclass__` against `VALID_CATEGORIES`; ABCs can't enforce write behavior so docstring + `SHADOW_LEDGER_ONLY = True` class flag carry the V1 contract (Skeptic's call).
+- Build: `connectors/base.py` (~215L) with 9 dataclasses (AuthToken, DateRange, NormalizedTransaction, NormalizedRecord, WriteProposal, ValidationResult, WriteResult, RollbackResult, CSVExport). `connectors/__init__.py` re-exports the public surface.
+- Verify: 8/8 connector-base tests pass; 124 total tests green (no regressions).
+- All 7 success criteria green.
+
+### qb-connector (feature 5, branch feature/qb-connector, commit a90541c)
+- Debate: V1 ships without a real QB sandbox; brief explicitly calls for mocked API responses. Decision — connector loads from `tests/fixtures/qb_entities.json` when `fixture_path` is set; live API path is implemented but exercised via injected HTTPClient mock. Defensive mapping accepts both fixture (`id`/`display_name`/flat email) and live QB (`Id`/`DisplayName`/nested `PrimaryEmailAddr.Address`) shapes.
+- Build: `connectors/quickbooks.py` (~380L). Injected `TokenStore` (default `InMemoryTokenStore`), `HTTPClient` protocol, `RateLimiter` (sliding window + exponential backoff with injectable clock/sleep — so tests don't actually wait 10s). OAuth refresh path covered. `read_transactions` wires the Invoice/Payment/Bill query path but returns `[]` in fixture mode (V1 fixtures are entities-only, brief defers line items to V2).
+- Verify: 22/22 QB tests pass including `test_execute_write_never_calls_http_client` (the load-bearing V1 invariant). All 46 fixture entities load (16 Customer + 5 Vendor + 25 Employee). Raw QB error bodies stripped from public exceptions.
+- All 11 success criteria green.
+
+### ruddr-connector (feature 6, branch feature/ruddr-connector, commit a0c8385)
+- Debate: RUDDR projects are nested arrays under client/vendor records in the fixture (no separate project IDs). `read_operational_records('project', ...)` flattens these — each project becomes a `NormalizedRecord` whose `parent_source_id` IS the project→client edge the matcher Stage 6 will consume. Synthetic project source_id `<client_id>::<project_code>` since the source doesn't assign one.
+- Build: `connectors/ruddr.py` (~340L). API-key auth (no OAuth refresh). Project code preserved verbatim in attributes (e.g. `CEN-GP-SOW1`) so matcher Stage 3 can parse the client prefix. Live-API path returns a flat `projects` collection and groups by `client_id` to feed the same flattening logic.
+- Verify: 24/24 RUDDR tests pass. All 45 fixture entities load (17 client + 3 vendor + 25 team-member). 42 nested projects flatten correctly (36 client-owned + 6 vendor-owned). Test `test_project_to_client_relationship_extractable` confirms every client-project's parent_source_id matches an actual client entity.
+- All 11 success criteria green.
+
+**Pipeline health:** Clean run. No retries needed on any feature. Git on host worked end-to-end (no `.git/*.lock` issues this round). Feature branches merged into main with `--no-ff`; no push performed (user authorizes push separately per /nex skill contract). Queue now reads: features 1-6 SHIPPED, 7-17 QUEUED. Next blocker on feature 7 (deterministic-blocking) is satisfied — both 4 and 5 (or 6) are shipped.
+
+**Known design decisions to revisit:**
+- Two connectors carry parallel `RateLimiter`, `InMemoryTokenStore`, `HTTPClient` definitions. If a third connector lands, lift to `connectors/_runtime.py`. V1 keeps them per-connector for clarity (no shared utility yet warranted).
+- `read_transactions` returns `[]` in fixture mode for both connectors. When transaction fixtures land (or when matcher Stage 3 demands them), generate via `scripts/generate_test_data.py` and add to fixture-mode path.
