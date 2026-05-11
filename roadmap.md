@@ -24,6 +24,12 @@ A deployable web app where a customer connects QuickBooks Online (accounting) an
 2. **Cross-category ingestion prototype** — connect QB to RUDDR, prove same entity appears under structurally different identifiers, document every cross-category discrepancy pattern.
 3. **Five customer interviews** — how do Controllers reconcile PSA against accounting? How do they match RUDDR project codes to QB customer records?
 
+Read roadmap.md. Find the Active Feature Queue table. Identify the 
+first feature with status QUEUED or IN PROGRESS. Read its brief 
+from the path in the Brief column. Execute the pipeline steps 
+from the previous orchestration prompt. When done, update the 
+Status column in roadmap.md to SHIPPED.
+
 ### V1 Build — Ranked by Dependency
 
 | Priority | Feature | Why This Order |
