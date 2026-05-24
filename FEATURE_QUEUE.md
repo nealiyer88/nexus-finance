@@ -10,7 +10,7 @@
 | 4 | features/infrastructure/connector-base.md | 2, 3 | S | SHIPPED |
 | 5 | features/connectors/qb-connector.md | 3, 4 | L | SHIPPED |
 | 6 | features/connectors/ruddr-connector.md | 3, 4 | L | SHIPPED |
-| 7 | features/pipeline/deterministic-blocking.md | 4, 5 or 6 | L | QUEUED |
+| 7 | features/pipeline/deterministic-blocking.md | 4, 5 or 6 | L | SHIPPED |
 | 8 | features/pipeline/pairwise-scoring.md | 7 | L | QUEUED |
 | 9 | features/pipeline/threshold-llm-fallback.md | 8 | M | QUEUED |
 | 10 | features/pipeline/resolution-graph-update.md | 9 | M | QUEUED |
