@@ -229,3 +229,170 @@ def get_entity_category(
     if row is None:
         return None
     return row[0]
+
+
+# ---------------------------------------------------------------------------
+# Stage 3 reads (pairwise scoring)
+# ---------------------------------------------------------------------------
+
+
+def get_aliases(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> list[str]:
+    """Return every `entity_aliases.value` for this canonical.
+
+    The canonical's own `canonical_name` is NOT included — Stage 3
+    scores it separately as part of the weighted string-metric sum.
+    Tenant-scoped when `tenant_id` is set.
+    """
+    if tenant_id is None:
+        rows = conn.execute(
+            "SELECT value FROM entity_aliases WHERE canonical_id = ?",
+            (canonical_id,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT a.value
+              FROM entity_aliases AS a
+              JOIN canonical_entities AS c ON c.canonical_id = a.canonical_id
+             WHERE a.canonical_id = ?
+               AND c.tenant_id = ?
+            """,
+            (canonical_id, tenant_id),
+        ).fetchall()
+    return [value for (value,) in rows if value]
+
+
+def get_canonical_name_and_category(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> Optional[tuple[str, str, str]]:
+    """Return `(canonical_name, entity_category, entity_type)` for
+    `canonical_id`, or None if absent (or out of tenant scope).
+    """
+    if tenant_id is None:
+        row = conn.execute(
+            """
+            SELECT canonical_name, entity_category, entity_type
+              FROM canonical_entities
+             WHERE canonical_id = ?
+            """,
+            (canonical_id,),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            """
+            SELECT canonical_name, entity_category, entity_type
+              FROM canonical_entities
+             WHERE canonical_id = ?
+               AND tenant_id = ?
+            """,
+            (canonical_id, tenant_id),
+        ).fetchone()
+    if row is None:
+        return None
+    return (row[0], row[1], row[2])
+
+
+def _neighbors(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    tenant_id: Optional[str],
+) -> set[str]:
+    """Return the set of canonical_ids that share an edge with
+    `canonical_id`, bidirectionally. Tenant filter applies to BOTH
+    endpoints when set."""
+    if tenant_id is None:
+        rows = conn.execute(
+            """
+            SELECT target_node FROM entity_edges WHERE source_node = ?
+            UNION
+            SELECT source_node FROM entity_edges WHERE target_node = ?
+            """,
+            (canonical_id, canonical_id),
+        ).fetchall()
+        return {nid for (nid,) in rows}
+
+    rows = conn.execute(
+        """
+        SELECT e.target_node
+          FROM entity_edges AS e
+          JOIN canonical_entities AS cs ON cs.canonical_id = e.source_node
+          JOIN canonical_entities AS ct ON ct.canonical_id = e.target_node
+         WHERE e.source_node = ?
+           AND cs.tenant_id = ?
+           AND ct.tenant_id = ?
+        UNION
+        SELECT e.source_node
+          FROM entity_edges AS e
+          JOIN canonical_entities AS cs ON cs.canonical_id = e.source_node
+          JOIN canonical_entities AS ct ON ct.canonical_id = e.target_node
+         WHERE e.target_node = ?
+           AND cs.tenant_id = ?
+           AND ct.tenant_id = ?
+        """,
+        (canonical_id, tenant_id, tenant_id, canonical_id, tenant_id, tenant_id),
+    ).fetchall()
+    return {nid for (nid,) in rows}
+
+
+def count_shared_person_neighbors(
+    conn: sqlite3.Connection,
+    source_canonical_id: Optional[str],
+    candidate_canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> int:
+    """Count canonical_ids of `entity_category='person'` that are
+    neighbors of BOTH endpoints via `entity_edges`. Returns 0 when
+    `source_canonical_id` is None (Stage 3 query side is typically
+    unresolved at scoring time)."""
+    if source_canonical_id is None:
+        return 0
+
+    src = _neighbors(conn, source_canonical_id, tenant_id)
+    cand = _neighbors(conn, candidate_canonical_id, tenant_id)
+    shared = src & cand
+    if not shared:
+        return 0
+
+    placeholders = ",".join("?" for _ in shared)
+    if tenant_id is None:
+        rows = conn.execute(
+            f"""
+            SELECT COUNT(*) FROM canonical_entities
+             WHERE entity_category = 'person'
+               AND canonical_id IN ({placeholders})
+            """,
+            tuple(shared),
+        ).fetchone()
+    else:
+        rows = conn.execute(
+            f"""
+            SELECT COUNT(*) FROM canonical_entities
+             WHERE entity_category = 'person'
+               AND tenant_id = ?
+               AND canonical_id IN ({placeholders})
+            """,
+            (tenant_id, *tuple(shared)),
+        ).fetchone()
+    return int(rows[0]) if rows else 0
+
+
+def count_shared_graph_neighbors(
+    conn: sqlite3.Connection,
+    source_canonical_id: Optional[str],
+    candidate_canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> int:
+    """Count distinct canonical_ids connected to BOTH endpoints via
+    `entity_edges`, bidirectionally. Returns 0 when
+    `source_canonical_id` is None."""
+    if source_canonical_id is None:
+        return 0
+    src = _neighbors(conn, source_canonical_id, tenant_id)
+    cand = _neighbors(conn, candidate_canonical_id, tenant_id)
+    return len(src & cand)
