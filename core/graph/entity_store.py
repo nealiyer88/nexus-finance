@@ -406,3 +406,59 @@ def count_shared_graph_neighbors(
     src = _neighbors(conn, source_canonical_id, tenant_id)
     cand = _neighbors(conn, candidate_canonical_id, tenant_id)
     return len(src & cand)
+
+
+# ---------------------------------------------------------------------------
+# Stage 4 reads (threshold / cluster conflict)
+# ---------------------------------------------------------------------------
+
+
+def are_clustered(
+    conn: sqlite3.Connection,
+    cid_a: str,
+    cid_b: str,
+    tenant_id: Optional[str] = None,
+) -> bool:
+    """Return True iff a SAME_AS edge exists between `cid_a` and `cid_b`
+    (in either direction) in `entity_edges`.
+
+    V1 has no Stage 6 (resolution / graph update) writes yet, so this
+    returns False for every production call — shipped now so Stage 6
+    can populate `entity_edges` rows with `relationship='SAME_AS'`
+    without revisiting Stage 4.
+
+    Tenant scoping: when `tenant_id` is set, BOTH endpoints must belong
+    to the tenant for the edge to count. A cross-tenant edge (which
+    shouldn't exist in V1 anyway) is ignored under a scoped query.
+    """
+    if cid_a == cid_b:
+        return False  # same canonical — not a conflict and not a cluster pair
+
+    if tenant_id is None:
+        row = conn.execute(
+            """
+            SELECT 1 FROM entity_edges
+             WHERE relationship = 'SAME_AS'
+               AND ((source_node = ? AND target_node = ?)
+                 OR (source_node = ? AND target_node = ?))
+             LIMIT 1
+            """,
+            (cid_a, cid_b, cid_b, cid_a),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            """
+            SELECT 1
+              FROM entity_edges AS e
+              JOIN canonical_entities AS cs ON cs.canonical_id = e.source_node
+              JOIN canonical_entities AS ct ON ct.canonical_id = e.target_node
+             WHERE e.relationship = 'SAME_AS'
+               AND cs.tenant_id = ?
+               AND ct.tenant_id = ?
+               AND ((e.source_node = ? AND e.target_node = ?)
+                 OR (e.source_node = ? AND e.target_node = ?))
+             LIMIT 1
+            """,
+            (tenant_id, tenant_id, cid_a, cid_b, cid_b, cid_a),
+        ).fetchone()
+    return row is not None
