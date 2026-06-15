@@ -139,3 +139,37 @@
 **Phase 6 — ship.** Recording now.
 
 **Pipeline health:** Clean Rocket run. Adversary debate caught the multi-hit-on-scalar-return collision-silencer bug at design time (would have shipped as a subtle silent-failure if the brief had been built verbatim). Code review iteration caught the dedupe bug that no first-pass test exercised. Both safety nets — adversary at design time and reviewer at code time — fired on real correctness bugs in this run. Queue: features 1–7 SHIPPED, 8–17 QUEUED.
+
+---
+
+## Run: 2026-06-14 (Rocket, autonomous)
+
+**Skill:** rocket (Autonomous Feature Build Loop)
+**Brief:** features/pipeline/pairwise-scoring.md
+**Hardened design:** features/_adversaries/pairwise-scoring.md
+**Build prompt:** features/_prompts/pairwise-scoring.cc-prompt.md
+**Branch:** feature/pairwise-scoring
+**Files created:** 3 (core/matching/scoring.py, core/matching/weights.py, tests/test_scoring.py)
+**Files modified outside the 3 new:** 2 source (core/matching/types.py +3 frozen dataclasses; core/graph/entity_store.py +4 read functions); logs/queue (FEATURE_QUEUE.md, SHIPPED.md, this file, CC-LEARNINGS.md, PROMPT_LOG.md)
+**Test count before:** 205
+**Test count after:** 234 (+29 new)
+**Adversaries:** 3 (design / skeptic / engineer) — all returned. Hardened design recorded ~20 explicit DECISIONS (cuts: name_inversion_score, email soft signal, shared-transaction-context signal; adds: clamp, evidence caps, profile_id debuggability, hygiene tests).
+**Review iterations:** 2 (first iter: 0 BLOCKING from QA + 2 BLOCKING + 8 WARNING from code review; QA green on both iters)
+**Fixer iterations:** 1
+**Outcome:** PASS / SHIPPED
+
+**Phase 1 — adversaries.** Skeptic flagged: (a) transactions table doesn't exist → shared-transaction-context signal unbuildable; (b) name-inversion 0.95 override double-counts Stage 0; (c) email +0.10 signal unreachable because Stage 1 already resolves email matches at 0.99; (d) score is unbounded (no clamp specified); (e) graph-neighborhood-overlap cap missing. Engineer dismissed phantom perf risks (~25K signal calls < 5s at V1 scale), agreed with skeptic on cuts (a)(b)(c), recommended split of WeightConfig (weights vs overrides). Design defended four RapidFuzz signals + n-gram Jaccard + category dispatch. Reconciliation: skeptic wins on cuts; explicit caps added (per-shared-person 0.05/max 0.10; per-neighbor 0.025/max 0.10); score clamped [0,1]; engineer wins on one-cell dispatch + default fallback.
+
+**Phase 2 — prompt.** SCOPE prompt with all 8 sections. 5 file paths, 9 brief acceptance criteria + 20 hardened-design test additions enumerated.
+
+**Phase 3 — build.** Created 3 new modules, appended to 2 existing. Mid-build: one synthesized-non-match test fixture failed because "Atlas Media Group" and "Meridian Capital Group" share "group" → added a shared-token filter so synthesized non-matches are token-disjoint (correctly leaves shared-noise-word pairs in the 0.50–0.70 SURFACE band where they belong). 234 green at first build commit (0e722f5).
+
+**Phase 4 iteration 1.** QA: PASS. Code review: FAIL — 2 BLOCKING + 8 WARNING. Blockers: (1) `get_aliases` returned rows where `value == canonical_name`, double-counting the perfect-match signal via alias_boost when the V1 canonical-write convention seeds a canonical-source alias; (2) `_check_psa_abbreviation` did not gate the candidate-side and alias-side shortcode branches on PSA-category, allowing accounting-side ≤4-char names to spuriously fire the bonus.
+
+**Phase 5 — fixer.** SQL-level filter on `get_aliases` (both tenant branches) + defensive guard in `_compute_alias_boost_fires` skipping `alias == candidate_name` (case-insensitive). `_check_psa_abbreviation` dropped `entity_source` kwarg; all three branches gated on category=="psa". Inversion test re-seeded with `"chen michael"` (token-reorder, ≠ canonical_name) so alias_boost still fires. `test_alias_boost_single_application` strengthened: candidate_name moved to mid-band so stacking would be observable below the clamp. Hygiene fence widened (+fastembed, sentence_transformers, torch, transformers). PEP 585 lowercase generics in weights.py. Two unused-import cleanups.
+
+**Phase 4 iteration 2.** QA: PASS. Code review: PASS. 0 BLOCKING, 0 WARNING new. 234 tests green.
+
+**Phase 6 — ship.** Recording now.
+
+**Pipeline health:** Clean run with one fixer iteration. The skeptic's design-time cuts (no transactions signal, no name-inversion override, no email soft signal) prevented ~3 dead-code paths from shipping; without those cuts the QA pass might have masked silent-zero behaviors. Code reviewer's blocking on `get_aliases` caught a silent double-count that QA missed — the inversion test was passing for the wrong reason (alias seeded equal to canonical_name). Both safety nets — adversary at design time, reviewer at code time — fired on real correctness bugs again this run. Queue: features 1–8 SHIPPED, 9–17 QUEUED.

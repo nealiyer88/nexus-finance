@@ -23,3 +23,21 @@ this file. Counts and filenames only.
 **Outcome:** PASS / SHIPPED
 
 ---
+
+## 2026-06-14 — Rocket build of feature 8 (pairwise-scoring)
+
+**Skill:** rocket (Autonomous Feature Build Loop)
+**Brief:** features/pipeline/pairwise-scoring.md
+**Hardened design:** features/_adversaries/pairwise-scoring.md
+**Build prompt:** features/_prompts/pairwise-scoring.cc-prompt.md
+**Branch:** feature/pairwise-scoring
+**Files created:** 3 (1 scoring module + 1 weights module + 1 test file)
+**Files modified outside the 3 new:** 2 source files (types.py +3 frozen dataclasses; entity_store.py +4 read functions); 5 logs/queue (FEATURE_QUEUE.md, SHIPPED.md, RUN_LOG.md, CC-LEARNINGS.md, this file)
+**Test count before:** 205
+**Test count after:** 234 (+29 new)
+**Adversaries:** 3 (design / skeptic / engineer) — all returned, reconciled to hardened design with ~20 explicit DECISIONS per disagreement
+**Review iterations:** 2 (first iter: 2 BLOCKING + 8 WARNING from code review; QA green on both iters)
+**Fixer iterations:** 1
+**Outcome:** PASS / SHIPPED
+
+---
