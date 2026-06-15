@@ -245,11 +245,20 @@ def get_aliases(
 
     The canonical's own `canonical_name` is NOT included — Stage 3
     scores it separately as part of the weighted string-metric sum.
-    Tenant-scoped when `tenant_id` is set.
+    The V1 canonical-write convention seeds a `value == canonical_name`
+    alias (rules §3 example), so the exclusion is enforced at the SQL
+    layer via a JOIN against `canonical_entities` and a `value !=
+    canonical_name` filter. Tenant-scoped when `tenant_id` is set.
     """
     if tenant_id is None:
         rows = conn.execute(
-            "SELECT value FROM entity_aliases WHERE canonical_id = ?",
+            """
+            SELECT a.value
+              FROM entity_aliases AS a
+              JOIN canonical_entities AS c ON c.canonical_id = a.canonical_id
+             WHERE a.canonical_id = ?
+               AND a.value != c.canonical_name
+            """,
             (canonical_id,),
         ).fetchall()
     else:
@@ -260,6 +269,7 @@ def get_aliases(
               JOIN canonical_entities AS c ON c.canonical_id = a.canonical_id
              WHERE a.canonical_id = ?
                AND c.tenant_id = ?
+               AND a.value != c.canonical_name
             """,
             (canonical_id, tenant_id),
         ).fetchall()

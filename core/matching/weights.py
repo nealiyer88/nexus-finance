@@ -22,7 +22,6 @@ tuning surface is interpretable and grep-able.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Tuple
 
 
 @dataclass(frozen=True)
@@ -61,7 +60,7 @@ PSA_ACCOUNTING_WEIGHTS: WeightConfig = WeightConfig(
 )
 
 
-_DISPATCH: Dict[Tuple[str, str], WeightConfig] = {
+_DISPATCH: dict[tuple[str, str], WeightConfig] = {
     ("accounting", "psa"): PSA_ACCOUNTING_WEIGHTS,
     ("psa", "accounting"): PSA_ACCOUNTING_WEIGHTS,
 }

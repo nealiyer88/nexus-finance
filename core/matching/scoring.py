@@ -132,7 +132,6 @@ def ngram_jaccard(a: str, b: str) -> float:
 
 def _check_psa_abbreviation(
     entity_name: str,
-    entity_source: str,
     candidate_name: str,
     candidate_aliases: tuple[str, ...],
     entity_category: str,
@@ -140,10 +139,12 @@ def _check_psa_abbreviation(
 ) -> bool:
     """Implements the PSA shortcode heuristic.
 
-    Fires only when the category pair is PSA↔Accounting AND one side
-    (the shortcode side) is ≤4 chars normalized AND that side is the
-    PSA side (source = `ruddr`) or any of the candidate's aliases is
-    ≤4 chars. Match patterns:
+    Fires only when the category pair is PSA↔Accounting AND the
+    shortcode side (the ≤4-char side) is the PSA side. In V1 the only
+    PSA connector is RUDDR, so the category-pair invariant uniquely
+    identifies which side is PSA — gating on category alone is
+    sufficient and consistent across the entity, candidate, and alias
+    branches. Match patterns:
 
         (i)  shortcode is a prefix of any whitespace-token of the
              long side; OR
@@ -159,13 +160,17 @@ def _check_psa_abbreviation(
 
     candidates: list[tuple[str, str]] = []  # (shortcode, long_side)
 
-    if entity_source == "ruddr" and 0 < len(entity_name) <= SHORTCODE_MAX_LEN:
+    # Entity-side shortcode: only when the entity is the PSA side.
+    if entity_category == "psa" and 0 < len(entity_name) <= SHORTCODE_MAX_LEN:
         candidates.append((entity_name, candidate_name))
-    if 0 < len(candidate_name) <= SHORTCODE_MAX_LEN:
+    # Candidate-side shortcode: only when the candidate is the PSA side.
+    if candidate_category == "psa" and 0 < len(candidate_name) <= SHORTCODE_MAX_LEN:
         candidates.append((candidate_name, entity_name))
-    for alias in candidate_aliases:
-        if 0 < len(alias) <= SHORTCODE_MAX_LEN:
-            candidates.append((alias, entity_name))
+    # Alias-side shortcode: only when the candidate (alias owner) is PSA.
+    if candidate_category == "psa":
+        for alias in candidate_aliases:
+            if 0 < len(alias) <= SHORTCODE_MAX_LEN:
+                candidates.append((alias, entity_name))
 
     for shortcode, long_side in candidates:
         sc = shortcode.strip().lower()
@@ -185,17 +190,27 @@ def _check_psa_abbreviation(
 
 def _compute_alias_boost_fires(
     entity_name: str,
+    candidate_name: str,
     candidate_aliases: tuple[str, ...],
 ) -> bool:
     """Return True iff `max(token_set_ratio, jaro_winkler)` of
     `entity_name` against any alias exceeds `ALIAS_BOOST_THRESHOLD`
     (RapidFuzz 0..100 scale). Single application per pair regardless
     of how many aliases would qualify.
+
+    Defensive guard: any alias whose value equals `candidate_name`
+    (case-insensitive) is skipped — `get_aliases` already filters
+    `value == canonical_name` at the SQL layer, but the boost path
+    must not double-count the canonical's own name even when callers
+    bypass that filter.
     """
     if not entity_name or not candidate_aliases:
         return False
+    cand_lower = candidate_name.strip().lower()
     for alias in candidate_aliases:
         if not alias:
+            continue
+        if alias.strip().lower() == cand_lower:
             continue
         ts = fuzz.token_set_ratio(entity_name, alias)
         jw = JaroWinkler.similarity(entity_name, alias) * 100.0
@@ -208,7 +223,6 @@ def _compute_signal_breakdown(
     entity_name: str,
     candidate_name: str,
     candidate_aliases: tuple[str, ...],
-    entity_source: str,
     entity_category: str,
     candidate_category: str,
 ) -> SignalBreakdown:
@@ -219,10 +233,11 @@ def _compute_signal_breakdown(
     partial = float(fuzz.partial_ratio(entity_name, candidate_name))
     jaro = JaroWinkler.similarity(entity_name, candidate_name) * 100.0
     jaccard = ngram_jaccard(entity_name, candidate_name)
-    alias_fired = _compute_alias_boost_fires(entity_name, candidate_aliases)
+    alias_fired = _compute_alias_boost_fires(
+        entity_name, candidate_name, candidate_aliases
+    )
     abbrev_fired = _check_psa_abbreviation(
         entity_name=entity_name,
-        entity_source=entity_source,
         candidate_name=candidate_name,
         candidate_aliases=candidate_aliases,
         entity_category=entity_category,
@@ -332,7 +347,6 @@ def score_pair(
         entity_name=entity_name,
         candidate_name=candidate_name,
         candidate_aliases=candidate_aliases,
-        entity_source=entity.source,
         entity_category=entity.category,
         candidate_category=candidate_category,
     )

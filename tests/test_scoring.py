@@ -12,7 +12,7 @@ import math
 import pathlib
 import random
 import sqlite3
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
 
 import pytest
 
@@ -113,11 +113,6 @@ def _insert_edge(
         """,
         (source_node, target_node, relationship, source_category, target_category, 1.0),
     )
-
-
-def _entity_from_raw(raw: dict) -> Any:
-    """Pass a synthesized connector-style dict through the normalizer."""
-    return normalize_entity(raw)
 
 
 def _make_entity(
@@ -251,10 +246,9 @@ def test_empty_candidate_name_returns_zero_score(conn: sqlite3.Connection) -> No
 
 
 def test_psa_abbreviation_heuristic_fires_on_prefix_match() -> None:
-    """RUDDR shortcode 'cen' (≤4 chars) prefix-matches token in long side."""
+    """PSA shortcode 'cen' (≤4 chars) prefix-matches token in long side."""
     fires = _check_psa_abbreviation(
         entity_name="cen",
-        entity_source="ruddr",
         candidate_name="cenlar fsb",
         candidate_aliases=(),
         entity_category="psa",
@@ -267,7 +261,6 @@ def test_psa_abbreviation_heuristic_fires_on_initialism_match() -> None:
     """Shortcode equals consonant-skeleton initials of long side."""
     fires = _check_psa_abbreviation(
         entity_name="mcg",
-        entity_source="ruddr",
         candidate_name="meridian consulting group",
         candidate_aliases=(),
         entity_category="psa",
@@ -281,7 +274,6 @@ def test_psa_abbreviation_heuristic_does_not_fire_on_long_names() -> None:
     neither side ≤4 chars, heuristic must NOT fire."""
     fires = _check_psa_abbreviation(
         entity_name="stratos cloud",
-        entity_source="ruddr",
         candidate_name="cloudnine infrastructure",
         candidate_aliases=(),
         entity_category="psa",
@@ -293,7 +285,6 @@ def test_psa_abbreviation_heuristic_does_not_fire_on_long_names() -> None:
 def test_psa_abbreviation_heuristic_does_not_fire_outside_psa_accounting_pair() -> None:
     fires = _check_psa_abbreviation(
         entity_name="cen",
-        entity_source="ruddr",
         candidate_name="cenlar fsb",
         candidate_aliases=(),
         entity_category="crm",
@@ -309,32 +300,41 @@ def test_psa_abbreviation_heuristic_does_not_fire_outside_psa_accounting_pair() 
 
 def test_alias_boost_single_application(conn: sqlite3.Connection) -> None:
     """Multiple aliases ≥0.85 must produce a SINGLE +0.15 bonus, not a
-    stacked bonus."""
+    stacked bonus.
+
+    Using `candidate_name="acme group ventures"` ensures the weighted
+    sum lands in the ~0.6–0.7 range so the clamp does not hide a
+    stacking bug — if the boost stacked, the 3-alias score would be
+    measurably higher than the 1-alias score. Both must instead be
+    equal (single application).
+    """
     entity = _make_entity("Acme Corp", source="quickbooks")
-    # Three aliases, all near-identical to entity name.
+    # Three aliases, all near-identical to entity name; none equal
+    # candidate_name (so the defensive guard does not skip them).
     aliases = ("acme corp", "acme corporation", "acme corp inc")
     result = score_pair(
         entity=entity,
         candidate_id="CAN-A",
-        candidate_name="acme corp",
+        candidate_name="acme group ventures",
         candidate_aliases=aliases,
         candidate_category="psa",
         conn=conn,
     )
-    # With perfect string match (weighted=0.85) + alias bonus (0.15) the
-    # score is exactly 1.0 — stacking would have overshot the clamp from
-    # an even higher raw value.
     assert result.signal_breakdown.alias_boost_fired is True
     # Re-score with a single matching alias to verify the same end score.
     single = score_pair(
         entity=entity,
         candidate_id="CAN-A",
-        candidate_name="acme corp",
+        candidate_name="acme group ventures",
         candidate_aliases=("acme corp",),
         candidate_category="psa",
         conn=conn,
     )
-    assert math.isclose(result.score, single.score)
+    assert single.signal_breakdown.alias_boost_fired is True
+    assert math.isclose(result.score, single.score), (
+        f"alias_boost stacked: 3-alias score={result.score}, "
+        f"1-alias score={single.score}"
+    )
 
 
 def test_alias_boost_does_not_fire_when_aliases_diverge(conn: sqlite3.Connection) -> None:
@@ -606,8 +606,8 @@ def test_person_inversion_pair_scores_at_least_0_95_via_string_metrics(
     Chen' (RUDDR) both normalize to 'michael chen'. The 0.95 direct
     override is dropped (Stage 0 owns inversion). The alias-driven
     string-metric path still produces ≥0.95 because the canonical seeds
-    its source-side display names as aliases (V1 canonical-write
-    convention).
+    a token-reordered source-side alias (V1 canonical-write convention
+    excludes `value == canonical_name`).
     """
     qb_norm = _make_entity(
         "Chen, Michael", source="quickbooks", entity_category="person"
@@ -625,10 +625,13 @@ def test_person_inversion_pair_scores_at_least_0_95_via_string_metrics(
         entity_type="person",
         entity_category="person",
     )
-    # Aliases that would be seeded at canonical write (per the spec
-    # § 3 example, the canonical_name and source-side display names
-    # land in entity_aliases).
-    _insert_alias(conn, "CAN-018", qb_norm, source="quickbooks", category="accounting")
+    # Aliases differ from canonical_name but still trigger the alias
+    # boost. "chen michael" is a token-reorder of "michael chen":
+    # RapidFuzz token_set_ratio == 100, well above the 85 threshold.
+    inversion_alias = "chen michael"
+    _insert_alias(
+        conn, "CAN-018", inversion_alias, source="quickbooks", category="accounting"
+    )
     conn.commit()
 
     entity = _make_entity(
@@ -641,7 +644,7 @@ def test_person_inversion_pair_scores_at_least_0_95_via_string_metrics(
         entity=entity,
         candidate_id="CAN-018",
         candidate_name=ruddr_norm,
-        candidate_aliases=(qb_norm,),
+        candidate_aliases=(inversion_alias,),
         candidate_category="psa",
         conn=conn,
     )
@@ -828,7 +831,16 @@ def test_10_synthesized_non_match_pairs_score_below_no_match(
 
 def test_no_xgboost_no_fasttext_no_llm_in_scoring() -> None:
     src = (REPO_ROOT / "core" / "matching" / "scoring.py").read_text()
-    forbidden = ("xgboost", "fasttext", "anthropic", "openai")
+    forbidden = (
+        "xgboost",
+        "fasttext",
+        "anthropic",
+        "openai",
+        "fastembed",
+        "sentence_transformers",
+        "torch",
+        "transformers",
+    )
     for token in forbidden:
         assert token not in src, (
             f"scoring.py must not reference {token!r} (V1 NOT-SCOPE)"
