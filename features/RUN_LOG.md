@@ -102,3 +102,40 @@
 **Known design decisions to revisit:**
 - Two connectors carry parallel `RateLimiter`, `InMemoryTokenStore`, `HTTPClient` definitions. If a third connector lands, lift to `connectors/_runtime.py`. V1 keeps them per-connector for clarity (no shared utility yet warranted).
 - `read_transactions` returns `[]` in fixture mode for both connectors. When transaction fixtures land (or when matcher Stage 3 demands them), generate via `scripts/generate_test_data.py` and add to fixture-mode path.
+
+---
+
+## Run: 2026-05-23 (Rocket, autonomous)
+
+**Trigger:** Manual (user invoked `/rocket` slash command)
+**Pipeline mode:** Phase 1 adversary debate (design / skeptic / engineer in parallel) → Phase 2 SCOPE prompt → Phase 3 build → Phase 4 parallel QA + code review → Phase 5 fixer (1 iteration) → Phase 4 re-review → Phase 6 ship
+**Features attempted:** 1 (deterministic-blocking — Pipeline Stages 1 + 2)
+**Shipped:** deterministic-blocking
+**Blocked:** none
+**Review iterations:** 2 (1 BLOCKING fix between)
+**Test count delta:** 170 → 205 (+35 new)
+
+### deterministic-blocking (feature 7, branch feature/deterministic-blocking)
+
+**Phase 1 — adversaries.** All three returned within 2 minutes. Reconciled to `features/_adversaries/deterministic-blocking.md`. Key decisions:
+- Cut PhoneticIndex/Metaphone — no library installed; adding C-extension dep unjustified at 44 fixture canonicals. Stage 0 already case-folds and strips diacritics. Kept TokenIndex + NgramIndex (trigram, pure stdlib).
+- Cut Stage 1c canonical_id echo — `NormalizedEntity` has no canonical_id field; no V1 connector emits one.
+- Cut Tax ID / EIN matching — schema has no EIN column.
+- Cut index `update()` — Stage 6's job; rebuild-on-pipeline-start is sub-millisecond at V1 scale.
+- Kept skeptic's load-bearing fixes: `lookup_alias_exact` / `lookup_email` return `list[str]` not scalar (collision safety); confidence emission = `min(alias_conf, 0.99)` not hardcoded; tenant_id parameter on every entity_store read; trigram sentinel padding `^…$` for short names like `"ibm"`.
+- Kept design's load-bearing fix: intra-system filter operates on `(source, source_id)` not `category` (canonicals spanning QB+RUDDR must survive).
+- Engineer's verdicts won on: function-module entity_store (not class), no IDF ranking on cap (just hard truncate + warn), shared types in `core/matching/types.py`.
+
+**Phase 2 — prompt.** Generated SCOPE prompt at `features/_prompts/deterministic-blocking.cc-prompt.md` with all 8 sections. 9 file paths enumerated, 25+ acceptance criteria, explicit NON-GOALS list, 15-step EXECUTION sequence.
+
+**Phase 3 — build.** Created `core/matching/{__init__,types,indices,deterministic,blocking}.py`, `core/graph/{__init__,entity_store}.py`, `tests/test_{deterministic,blocking}.py`. No edits to existing files. Two test fixes mid-build: (a) shadowed canonical_name in `test_email_case_insensitive` caused alias_exact to short-circuit — used a distinct normalized_name; (b) end-to-end fixture test: seeding both sides' sysrefs tripped the intra-system filter — restructured to seed only RUDDR sysrefs and query via QB raw records. Targeted run: 34 passing. Full suite: 204 passing.
+
+**Phase 4 iteration 1.** QA: PASS. Code review: FAIL — 1 BLOCKING + 3 NITs. Blocking: `lookup_alias_exact` returned both an alias row AND a canonical_name seed row for the SAME canonical_id when both equaled the query, causing Stage 1 to see `len != 1` and falsely declare a collision. Test suite didn't catch it because existing tests always seeded canonical_name and aliases as distinct strings.
+
+**Phase 5 — fixer.** Deduped `lookup_alias_exact` return list by `canonical_id` with MAX confidence per id, sorted output for deterministic ordering. Added regression test `test_alias_exact_dedupes_same_canonical_from_seed_and_alias`. Also addressed 3 NITs: removed unused `Iterable` import, replaced f-string LIKE patterns with plain string literals + one-line invariant comment, tightened `pytest.raises` to `dataclasses.FrozenInstanceError`. 35 tests, 205 full suite.
+
+**Phase 4 iteration 2.** QA: PASS. Code review: PASS. No blocking issues.
+
+**Phase 6 — ship.** Recording now.
+
+**Pipeline health:** Clean Rocket run. Adversary debate caught the multi-hit-on-scalar-return collision-silencer bug at design time (would have shipped as a subtle silent-failure if the brief had been built verbatim). Code review iteration caught the dedupe bug that no first-pass test exercised. Both safety nets — adversary at design time and reviewer at code time — fired on real correctness bugs in this run. Queue: features 1–7 SHIPPED, 8–17 QUEUED.
