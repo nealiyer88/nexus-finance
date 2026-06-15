@@ -132,7 +132,12 @@ while (( features_processed < MAX_FEATURES )); do
   # from new failures during the build.
   bash .claude/hooks/record-baseline.sh
 
-  claude -p "$(cat "$ROCKET_PROMPT")" --arg feature_brief="$brief_path"
+  # The rocket.md command instructs Claude to "process the feature brief at
+  # the path provided." We append the path to the prompt text since the
+  # claude CLI has no --arg flag in v2.1.x.
+  prompt_text="$(cat "$ROCKET_PROMPT")
+FEATURE BRIEF PATH: $brief_path"
+  claude -p "$prompt_text" --dangerously-skip-permissions
 
   status_after="$(status_of_row "$row_num")"
   features_processed=$((features_processed + 1))
