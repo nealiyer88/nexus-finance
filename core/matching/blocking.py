@@ -31,7 +31,7 @@ from typing import Optional
 
 from connectors.base import NormalizedEntity
 from core.graph.entity_store import get_system_refs
-from core.matching.indices import NgramIndex, TokenIndex
+from core.matching.indices import EmbeddingIndex, NgramIndex, TokenIndex
 from core.matching.types import CandidateEntity, CandidateSet
 
 
@@ -46,6 +46,7 @@ def generate_candidates(
     ngram_index: NgramIndex,
     conn: sqlite3.Connection,
     tenant_id: Optional[str] = None,
+    embedding_index: Optional[EmbeddingIndex] = None,
 ) -> CandidateSet:
     del tenant_id
 
@@ -63,6 +64,12 @@ def generate_candidates(
     for gram, cids in ngram_hits.items():
         for cid in cids:
             signals_by_candidate.setdefault(cid, set()).add(f"trigram:{gram}")
+
+    if embedding_index is not None:
+        query_vec = embedding_index._embed_fn(entity.normalized_name)
+        if query_vec is not None:
+            for cid, rank in embedding_index.top_k(query_vec, k=10):
+                signals_by_candidate.setdefault(cid, set()).add(f"embed:{rank}")
 
     if not signals_by_candidate:
         return CandidateSet(source_entity_id=entity.source_id, candidates=())

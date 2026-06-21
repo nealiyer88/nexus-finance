@@ -15,7 +15,7 @@ from connectors.base import NormalizedEntity
 from core.ingestion.normalizer import normalize_entity
 from core.matching.blocking import CANDIDATE_CAP, generate_candidates
 from core.matching.deterministic import deterministic_match
-from core.matching.indices import NgramIndex, TokenIndex
+from core.matching.indices import EmbeddingIndex, NgramIndex, TokenIndex
 from core.matching.types import CandidateSet
 
 
@@ -509,3 +509,68 @@ def test_fixture_end_to_end_each_canonical_reachable(conn: sqlite3.Connection) -
         checked += 1
 
     assert checked >= 19, f"expected >= 19 cross-source canonicals; checked {checked}"
+
+
+# ---------------------------------------------------------------------------
+# Stage 2c: EmbeddingIndex surfaces abbreviation candidates
+# ---------------------------------------------------------------------------
+
+
+def _load_stub_vectors() -> dict[str, list[float]]:
+    stub_path = REPO_ROOT / "tests" / "fixtures" / "stub_vectors.json"
+    return json.loads(stub_path.read_text())
+
+
+def test_stage_2c_embedding_surfaces_abbreviation_candidate(
+    conn: sqlite3.Connection,
+) -> None:
+    # Use a canonical name with no trigram overlap with "pacrim tech" so that
+    # token+trigram blocking alone cannot surface it.  The stub embed_fn maps
+    # "northwest software" to a vector close to "pacrim tech", exercising the
+    # embedding-only discovery path.
+    _insert_canonical(conn, "CAN-PACRM", "northwest software")
+    _insert_sysref(conn, "CAN-PACRM", "ruddr", "psa", "RUDDR-PACRM", {})
+    conn.commit()
+
+    tok = TokenIndex.build(conn)
+    ngm = NgramIndex.build(conn)
+
+    entity_pacrim_tech = _entity(
+        normalized_name="pacrim tech",
+        source="quickbooks",
+        source_id="QB-PACRM",
+    )
+
+    # Without embedding index: abbreviation does NOT surface via token/trigram
+    result_no_emb = generate_candidates(entity_pacrim_tech, tok, ngm, conn)
+    candidate_ids_no_emb = {c.canonical_id for c in result_no_emb.candidates}
+    assert "CAN-PACRM" not in candidate_ids_no_emb, (
+        "token/trigram alone should NOT surface CAN-PACRM for 'pacrim tech'"
+    )
+
+    # Stub embed: "pacrim tech" -> [1,0,...], "northwest software" -> [0.9,0.44,...] (cosine 0.9)
+    _STUB_VECS: dict[str, tuple[float, ...]] = {
+        "pacrim tech":      (1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+        "northwest software": (0.9, 0.43589, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+    }
+
+    def stub_embed(name: str):
+        return _STUB_VECS.get(name.strip().lower())
+
+    emb_idx = EmbeddingIndex.build(conn, embed_fn=stub_embed)
+
+    # With embedding index: abbreviation IS surfaced
+    result_with_emb = generate_candidates(
+        entity_pacrim_tech, tok, ngm, conn, embedding_index=emb_idx
+    )
+    candidate_ids_with_emb = {c.canonical_id for c in result_with_emb.candidates}
+    assert "CAN-PACRM" in candidate_ids_with_emb, (
+        "embedding index should surface CAN-PACRM for 'pacrim tech'"
+    )
+
+    pacrm_cand = next(
+        c for c in result_with_emb.candidates if c.canonical_id == "CAN-PACRM"
+    )
+    assert "embed:0" in pacrm_cand.blocking_signals, (
+        f"expected 'embed:0' in blocking signals; got {pacrm_cand.blocking_signals}"
+    )

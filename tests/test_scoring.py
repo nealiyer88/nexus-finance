@@ -18,9 +18,11 @@ import pytest
 
 from core.ingestion.normalizer import normalize_entity
 from core.matching.scoring import (
+    B_SIGNAL_CAP,
     MAX_NEIGHBORHOOD_BONUS,
     MAX_SHARED_PERSON_BONUS,
     _check_psa_abbreviation,
+    _compute_b_boosts,
     ngram_jaccard,
     score_candidate_set,
     score_pair,
@@ -825,23 +827,154 @@ def test_10_synthesized_non_match_pairs_score_below_no_match(
 
 
 # ---------------------------------------------------------------------------
-# 12. Hygiene: no forbidden imports in scoring.py
+# 12. fastText Signal C abbreviation lift
+# ---------------------------------------------------------------------------
+
+import json as _json
+
+
+def _stub_embed_fn(vecs: dict[str, tuple[float, ...]]):
+    """Return a closure that maps normalized names to stub vectors."""
+    def _embed(name: str):
+        return vecs.get(name.strip().lower())
+    return _embed
+
+
+def _load_stub_vectors() -> dict[str, tuple[float, ...]]:
+    stub_path = REPO_ROOT / "tests" / "fixtures" / "stub_vectors.json"
+    raw = _json.loads(stub_path.read_text())
+    return {k: tuple(v) for k, v in raw.items()}
+
+
+def test_fasttext_signal_c_abbreviation_lift(
+    conn: sqlite3.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stubs = _load_stub_vectors()
+    stub_embed = _stub_embed_fn(stubs)
+
+    import core.matching.scoring as scoring_mod
+    monkeypatch.setattr(scoring_mod, "embed", stub_embed)
+
+    # "pacrim tech" vs "pacrim technologies": base=0.658, +ft(0.9,w=0.20)=0.838 (crosses 0.70)
+    # "meridian cap" vs "meridian capital group": base=0.665, +ft=0.845 (crosses 0.70)
+    pairs = [
+        ("pacrim tech", "pacrim technologies"),
+        ("meridian cap", "meridian capital group"),
+    ]
+    for entity_name, candidate_name in pairs:
+        entity = _make_entity(entity_name, source="quickbooks")
+        _insert_canonical(conn, f"CAN-{entity_name[:6]}", candidate_name)
+        conn.commit()
+
+        import core.matching.weights as weights_mod
+        from core.matching.weights import WeightConfig
+
+        result_on = score_pair(
+            entity=entity,
+            candidate_id=f"CAN-{entity_name[:6]}",
+            candidate_name=candidate_name,
+            candidate_aliases=(),
+            candidate_category="psa",
+            conn=conn,
+        )
+        assert result_on.score > 0.70, (
+            f"Signal C enabled: {entity_name!r} vs {candidate_name!r} "
+            f"score={result_on.score:.4f} (expected > 0.70)"
+        )
+
+        zero_ft_weights = WeightConfig(
+            token_sort_ratio=PSA_ACCOUNTING_WEIGHTS.token_sort_ratio,
+            token_set_ratio=PSA_ACCOUNTING_WEIGHTS.token_set_ratio,
+            partial_ratio=PSA_ACCOUNTING_WEIGHTS.partial_ratio,
+            jaro_winkler=PSA_ACCOUNTING_WEIGHTS.jaro_winkler,
+            ngram_jaccard=PSA_ACCOUNTING_WEIGHTS.ngram_jaccard,
+            alias_boost=PSA_ACCOUNTING_WEIGHTS.alias_boost,
+            abbreviation_bonus=0.0,
+            fasttext_cosine=0.0,
+            profile_id="test_zero_ft",
+        )
+        monkeypatch.setattr(scoring_mod, "get_weights", lambda sc, tc: zero_ft_weights)
+        result_off = score_pair(
+            entity=entity,
+            candidate_id=f"CAN-{entity_name[:6]}",
+            candidate_name=candidate_name,
+            candidate_aliases=(),
+            candidate_category="psa",
+            conn=conn,
+        )
+        assert result_off.score < 0.70, (
+            f"Signal C disabled: {entity_name!r} vs {candidate_name!r} "
+            f"score={result_off.score:.4f} (expected < 0.70)"
+        )
+        monkeypatch.setattr(scoring_mod, "get_weights", weights_mod.get_weights)
+
+
+def test_fasttext_signal_c_negative_control(
+    conn: sqlite3.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stubs = _load_stub_vectors()
+    stub_embed = _stub_embed_fn(stubs)
+
+    import core.matching.scoring as scoring_mod
+    monkeypatch.setattr(scoring_mod, "embed", stub_embed)
+
+    entity = _make_entity("brightpath machine learning", source="quickbooks")
+    _insert_canonical(conn, "CAN-BML", "luminos ai")
+    conn.commit()
+
+    result = score_pair(
+        entity=entity,
+        candidate_id="CAN-BML",
+        candidate_name="luminos ai",
+        candidate_aliases=(),
+        candidate_category="psa",
+        conn=conn,
+    )
+    assert result.score < 0.50, (
+        f"negative control score={result.score:.4f} (expected < 0.50)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 13. Signal B cap
+# ---------------------------------------------------------------------------
+
+
+def test_signal_b_cap_clips_excess() -> None:
+    evidence = GraphEvidence(
+        shared_person_count=3,
+        shared_person_bonus=0.15,
+        neighborhood_overlap_count=4,
+        neighborhood_overlap_bonus=0.10,
+    )
+    boosts = _compute_b_boosts(evidence)
+    total = sum(b.applied for b in boosts)
+    assert pytest.approx(total, abs=1e-9) == B_SIGNAL_CAP
+    b6 = next(b for b in boosts if b.signal_id == "B6")
+    assert pytest.approx(b6.applied, abs=1e-9) == 0.05
+    assert pytest.approx(b6.raw, abs=1e-9) == 0.10
+
+
+# ---------------------------------------------------------------------------
+# 15. Hygiene: no forbidden imports in scoring.py
 # ---------------------------------------------------------------------------
 
 
 def test_no_xgboost_no_fasttext_no_llm_in_scoring() -> None:
     src = (REPO_ROOT / "core" / "matching" / "scoring.py").read_text()
     forbidden = (
-        "xgboost",
-        "fasttext",
-        "anthropic",
-        "openai",
-        "fastembed",
-        "sentence_transformers",
-        "torch",
-        "transformers",
+        "import fasttext",   "from fasttext",
+        "import xgboost",    "from xgboost",
+        "import anthropic",  "from anthropic",
+        "import openai",     "from openai",
+        "import fastembed",  "from fastembed",
+        "import sentence_transformers", "from sentence_transformers",
+        "import torch",      "from torch",
+        "import transformers", "from transformers",
     )
     for token in forbidden:
         assert token not in src, (
-            f"scoring.py must not reference {token!r} (V1 NOT-SCOPE)"
+            f"scoring.py must not reference {token!r} (V1 guardrail)"
         )

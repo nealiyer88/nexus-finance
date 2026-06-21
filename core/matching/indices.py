@@ -18,7 +18,9 @@ those on top of the candidates these indices produce.
 from __future__ import annotations
 
 import sqlite3
-from typing import ClassVar, Iterable, Optional
+from typing import Callable, ClassVar, Iterable, Optional
+
+from core.matching.embeddings import cosine, embed as _default_embed
 
 
 def _tokenize(value: str) -> list[str]:
@@ -117,6 +119,54 @@ class NgramIndex:
         padded = NgramIndex.PAD_LEFT + s + NgramIndex.PAD_RIGHT
         n = NgramIndex.N
         return tuple(padded[i : i + n] for i in range(len(padded) - n + 1))
+
+
+class EmbeddingIndex:
+    """In-memory flat-cosine ANN index: canonical_id -> mean embedding vector."""
+
+    def __init__(
+        self,
+        embed_fn: Callable[[str], Optional[tuple[float, ...]]] = _default_embed,
+    ) -> None:
+        self._vectors: dict[str, tuple[float, ...]] = {}
+        self._embed_fn = embed_fn
+
+    @classmethod
+    def build(
+        cls,
+        conn: sqlite3.Connection,
+        embed_fn: Callable[[str], Optional[tuple[float, ...]]] = _default_embed,
+        tenant_id: Optional[str] = None,
+    ) -> "EmbeddingIndex":
+        idx = cls(embed_fn=embed_fn)
+        accum: dict[str, list[tuple[float, ...]]] = {}
+        for canonical_id, value in _iter_seed_strings(conn, tenant_id):
+            vec = embed_fn(value)
+            if vec is not None:
+                accum.setdefault(canonical_id, []).append(vec)
+        for cid, vecs in accum.items():
+            n = len(vecs)
+            dim = len(vecs[0])
+            mean = tuple(sum(v[i] for v in vecs) / n for i in range(dim))
+            idx._vectors[cid] = mean
+        return idx
+
+    def top_k(
+        self,
+        query_vec: tuple[float, ...],
+        k: int = 10,
+    ) -> list[tuple[str, int]]:
+        """Return [(canonical_id, rank), ...] sorted descending by cosine, top-k.
+
+        Excludes entries with cosine <= 0.0. Rank is 0-indexed.
+        """
+        scored = [
+            (cid, cosine(query_vec, vec))
+            for cid, vec in self._vectors.items()
+        ]
+        scored = [(cid, s) for cid, s in scored if s > 0.0]
+        scored.sort(key=lambda x: -x[1])
+        return [(cid, rank) for rank, (cid, _) in enumerate(scored[:k])]
 
 
 def _iter_seed_strings(

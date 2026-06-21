@@ -9,7 +9,7 @@ overlapping result types.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal, Optional, Tuple
 
 
 MatchKeyType = Literal["alias_exact", "email", "employee_id"]
@@ -40,6 +40,13 @@ class CandidateSet:
 
 
 @dataclass(frozen=True)
+class SignalBoost:
+    signal_id: str
+    raw: float
+    applied: float
+
+
+@dataclass(frozen=True)
 class SignalBreakdown:
     """Per-signal values used to compute a ScoredMatch.
 
@@ -56,6 +63,8 @@ class SignalBreakdown:
     ngram_jaccard: float
     alias_boost_fired: bool
     abbreviation_bonus_fired: bool
+    fasttext_cosine: Optional[float] = None
+    b_signal_boosts: Tuple["SignalBoost", ...] = ()
 
 
 @dataclass(frozen=True)

@@ -33,6 +33,7 @@ class WeightConfig:
     ngram_jaccard: float
     alias_boost: float
     abbreviation_bonus: float
+    fasttext_cosine: float
     profile_id: str
 
 
@@ -44,6 +45,7 @@ DEFAULT_WEIGHTS: WeightConfig = WeightConfig(
     ngram_jaccard=0.10,
     alias_boost=0.15,
     abbreviation_bonus=0.0,
+    fasttext_cosine=0.0,
     profile_id="default_v1",
 )
 
@@ -56,6 +58,7 @@ PSA_ACCOUNTING_WEIGHTS: WeightConfig = WeightConfig(
     ngram_jaccard=0.10,
     alias_boost=0.15,
     abbreviation_bonus=0.20,
+    fasttext_cosine=0.20,
     profile_id="psa_accounting_v1",
 )
 

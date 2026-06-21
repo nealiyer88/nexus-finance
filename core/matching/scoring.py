@@ -47,6 +47,7 @@ Stage 1's deterministic anchors directly.
 
 from __future__ import annotations
 
+import dataclasses
 import sqlite3
 from typing import Optional
 
@@ -60,10 +61,12 @@ from core.graph.entity_store import (
     get_aliases,
     get_canonical_name_and_category,
 )
+from core.matching.embeddings import cosine, embed
 from core.matching.types import (
     CandidateSet,
     GraphEvidence,
     ScoredMatch,
+    SignalBoost,
     SignalBreakdown,
 )
 from core.matching.weights import WeightConfig, get_weights
@@ -80,6 +83,7 @@ PER_SHARED_PERSON_BONUS: float = 0.05
 MAX_SHARED_PERSON_BONUS: float = 0.10
 PER_NEIGHBORHOOD_NODE_BONUS: float = 0.025
 MAX_NEIGHBORHOOD_BONUS: float = 0.10
+B_SIGNAL_CAP: float = 0.20
 
 
 _ZERO_BREAKDOWN: SignalBreakdown = SignalBreakdown(
@@ -90,6 +94,8 @@ _ZERO_BREAKDOWN: SignalBreakdown = SignalBreakdown(
     ngram_jaccard=0.0,
     alias_boost_fired=False,
     abbreviation_bonus_fired=False,
+    fasttext_cosine=None,
+    b_signal_boosts=(),
 )
 
 _ZERO_EVIDENCE: GraphEvidence = GraphEvidence(
@@ -243,6 +249,7 @@ def _compute_signal_breakdown(
         entity_category=entity_category,
         candidate_category=candidate_category,
     )
+    ft_cosine = cosine(embed(entity_name), embed(candidate_name))
     return SignalBreakdown(
         token_sort_ratio=token_sort,
         token_set_ratio=token_set,
@@ -251,6 +258,8 @@ def _compute_signal_breakdown(
         ngram_jaccard=jaccard,
         alias_boost_fired=alias_fired,
         abbreviation_bonus_fired=abbrev_fired,
+        fasttext_cosine=ft_cosine,
+        b_signal_boosts=(),
     )
 
 
@@ -283,6 +292,21 @@ def _compute_graph_evidence(
     )
 
 
+def _compute_b_boosts(evidence: GraphEvidence) -> tuple[SignalBoost, ...]:
+    boosts = []
+    raw_b1 = evidence.shared_person_bonus
+    raw_b6 = evidence.neighborhood_overlap_bonus
+    remaining = B_SIGNAL_CAP
+    applied_b1 = min(raw_b1, remaining)
+    remaining -= applied_b1
+    applied_b6 = min(raw_b6, remaining)
+    if raw_b1 > 0.0 or applied_b1 > 0.0:
+        boosts.append(SignalBoost(signal_id="B1", raw=raw_b1, applied=applied_b1))
+    if raw_b6 > 0.0 or applied_b6 > 0.0:
+        boosts.append(SignalBoost(signal_id="B6", raw=raw_b6, applied=applied_b6))
+    return tuple(boosts)
+
+
 def _weighted_score(
     weights: WeightConfig, breakdown: SignalBreakdown, evidence: GraphEvidence
 ) -> float:
@@ -298,8 +322,8 @@ def _weighted_score(
         weighted_sum
         + (weights.alias_boost if breakdown.alias_boost_fired else 0.0)
         + (weights.abbreviation_bonus if breakdown.abbreviation_bonus_fired else 0.0)
-        + evidence.shared_person_bonus
-        + evidence.neighborhood_overlap_bonus
+        + weights.fasttext_cosine * (breakdown.fasttext_cosine or 0.0)
+        + sum(b.applied for b in breakdown.b_signal_boosts)
     )
     return min(1.0, max(0.0, raw))
 
@@ -356,6 +380,8 @@ def score_pair(
         candidate_canonical_id=candidate_id,
         tenant_id=tenant_id,
     )
+    b_boosts = _compute_b_boosts(evidence)
+    breakdown = dataclasses.replace(breakdown, b_signal_boosts=b_boosts)
     score = _weighted_score(weights, breakdown, evidence)
     return ScoredMatch(
         canonical_id=candidate_id,
