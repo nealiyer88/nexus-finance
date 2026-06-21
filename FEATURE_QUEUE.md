@@ -2,22 +2,55 @@
 
 > Pipeline reads this table to determine build order. Status updated as features ship. Dependencies are strict — downstream features cannot start until all dependencies are SHIPPED.
 
-| # | Brief | Depends On | Complexity | Status |
-|---|-------|------------|------------|--------|
-| 1 | features/infrastructure/rules-file-population.md | — | S | SHIPPED |
-| 2 | features/infrastructure/canonical-schema.md | 1 | M | SHIPPED |
-| 3 | features/pipeline/normalizer.md | 1, 2 | M | SHIPPED |
-| 4 | features/infrastructure/connector-base.md | 2, 3 | S | SHIPPED |
-| 5 | features/connectors/qb-connector.md | 3, 4 | L | SHIPPED |
-| 6 | features/connectors/ruddr-connector.md | 3, 4 | L | SHIPPED |
-| 7 | features/pipeline/deterministic-blocking.md | 4, 5 or 6 | L | SHIPPED |
-| 8 | features/pipeline/pairwise-scoring.md | 7 | L | SHIPPED |
-| 9 | features/pipeline/threshold-llm-fallback.md | 8 | M | QUEUED |
-| 10 | features/pipeline/resolution-graph-update.md | 9 | M | QUEUED |
-| 11 | features/dashboard/approval-queue.md | 9, 10 | M | QUEUED |
-| 12 | features/pipeline/matcher-orchestrator.md | 7, 8, 9, 10 | M | QUEUED |
-| 13 | features/data/historical-cold-start.md | 11, 12 | M | QUEUED |
-| 14 | features/dashboard/overview-entity-browser.md | 10, 11 | M | QUEUED |
-| 15 | features/dashboard/ar-reconciliation.md | 12, 14 | M | QUEUED |
-| 16 | features/infrastructure/connectors-audit-infra.md | 5, 6 | M | QUEUED |
-| 17 | features/infrastructure/signup-onboarding.md | ALL | L | QUEUED |
+> **Column ORDER is load-bearing — rocket.sh parses: `# | Feature | Brief | Depends On | Status`.** Do not reorder. Dependencies are a comma-separated list of feature IDs (ALL must be SHIPPED); the old `X or Y` and `ALL` syntaxes are not supported by upstream rocket.sh and have been flattened during migration.
+
+| # | Feature | Brief | Depends On | Status |
+|---|---------|-------|------------|--------|
+| 1 | rules-file-population | features/infrastructure/rules-file-population.md | — | SHIPPED |
+| 2 | canonical-schema | features/infrastructure/canonical-schema.md | 1 | SHIPPED |
+| 3 | normalizer | features/pipeline/normalizer.md | 1, 2 | SHIPPED |
+| 4 | connector-base | features/infrastructure/connector-base.md | 2, 3 | SHIPPED |
+| 5 | qb-connector | features/connectors/qb-connector.md | 3, 4 | SHIPPED |
+| 6 | ruddr-connector | features/connectors/ruddr-connector.md | 3, 4 | SHIPPED |
+| 7 | deterministic-blocking | features/pipeline/deterministic-blocking.md | 4, 5, 6 | SHIPPED |
+| 8 | pairwise-scoring | features/pipeline/pairwise-scoring.md | 7 | QUEUED |
+| 8a | fasttext-signal-retrofit | features/pipeline/fasttext-signal-retrofit.md | 7, 8 | QUEUED |
+| 9 | threshold-llm-fallback | features/pipeline/threshold-llm-fallback.md | 8 | QUEUED |
+| 10 | resolution-graph-update | features/pipeline/resolution-graph-update.md | 9 | QUEUED |
+| 11 | approval-queue | features/dashboard/approval-queue.md | 9, 10 | QUEUED |
+| 12 | matcher-orchestrator | features/pipeline/matcher-orchestrator.md | 7, 8, 9, 10 | QUEUED |
+| 13 | historical-cold-start | features/data/historical-cold-start.md | 11, 12 | QUEUED |
+| 14 | overview-entity-browser | features/dashboard/overview-entity-browser.md | 10, 11 | QUEUED |
+| 15 | ar-reconciliation | features/dashboard/ar-reconciliation.md | 12, 14 | QUEUED |
+| 16 | connectors-audit-infra | features/infrastructure/connectors-audit-infra.md | 5, 6 | QUEUED |
+| 17 | signup-onboarding | features/infrastructure/signup-onboarding.md | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 | QUEUED |
+
+> **v4 retrofit note (2026-06-20):** Product spec v4 made pre-trained fastText
+> V1-mandatory (Stage 2c blocking + Stage 3 Signal Set C) and raised the Phase 1
+> auto-match gate from 90% → 95%. Features 7 and 8 shipped under the V3 rules file
+> (fastText NOT-SCOPE, n-gram Jaccard as bridge signal) and are therefore INCOMPLETE
+> against v4. Feature 8a is the reconciliation. It is order-independent from feature 9
+> but is a HARD dependency for feature 12 (matcher-orchestrator) — do not run 12, and
+> do not measure against the 95% gate, until 8a is SHIPPED.
+>
+> Rules file `.claude/rules/01-nexus-finance-v1.md` updated (§1, §6, §11, §13):
+> pre-trained fastText moved to IN-SCOPE; fine-tuned fastText remains NOT-SCOPE.
+> Phase 1 success gate (90% → 95%) still needs updating in TEMPLATE.md, roadmap.md,
+> and the Phase-1 success criteria of the pipeline feature briefs.
+
+<!--
+Migration notes (2026-06-20):
+
+Format changed from the legacy nexus-finance schema (# | Brief | Depends On | Complexity | Status)
+to the upstream rocket-loop schema (# | Feature | Brief | Depends On | Status). The Complexity
+column was dropped (not used by the parser). A Feature short-name column was added (extracted
+from each brief's filename slug).
+
+Dependency syntax migrations:
+- Row 7  "4, 5 or 6"  →  "4, 5, 6"   (both connectors are SHIPPED; stricter, factually correct)
+- Row 17 "ALL"        →  "1..16"     (expanded explicitly; new parser has no ALL shorthand)
+
+Feature 7 (deterministic-blocking) status verified SHIPPED from prior state on main.
+Statuses for 8 and 9 reflect what is on main at the time of this migration — feature/pairwise-scoring
+and feature/threshold-llm-fallback exist as branches on origin but neither is merged to main yet.
+-->

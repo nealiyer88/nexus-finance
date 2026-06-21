@@ -1,42 +1,27 @@
 #!/usr/bin/env bash
-# record-baseline.sh — snapshot the current set of test node IDs into
-# .claude/hooks/test-baseline.txt. Called by rocket.sh before each feature
-# build so the qa-gate Stop hook can distinguish regressions (tests that
-# were in the baseline) from new failures (tests added during the build).
-#
-# Uses pytest --collect-only as a proxy for "currently passing tests" —
-# rocket.sh only records a baseline at the start of a build, when the
-# branch is green.
-
+# ── Record Baseline — Pre-Build Test Snapshot ───────────────────────────────
+# Snapshots passing test IDs before each build. qa-gate.sh uses this to
+# distinguish regressions from new failures. Called by rocket.sh before Phase 3.
+# ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
-cd "$PROJECT_DIR"
+PROJ="${CLAUDE_PROJECT_DIR:-.}"
+BASELINE_FILE="${PROJ}/.claude/hooks/test-baseline.txt"
+TEST_DIR="${PROJ}/tests"
 
-BASELINE_FILE=".claude/hooks/test-baseline.txt"
-
-if [ ! -d tests ]; then
-  : > "$BASELINE_FILE"
-  echo "Baseline recorded: 0 tests (no tests/ directory)"
-  exit 0
+# Collect command: prefer rocket.config.sh's BASELINE_COLLECT_CMD, else default.
+BASELINE_COLLECT_CMD="python -m pytest tests/ --collect-only -q"
+if [ -f "${PROJ}/rocket.config.sh" ]; then
+    # shellcheck disable=SC1090
+    source "${PROJ}/rocket.config.sh" 2>/dev/null || true
 fi
 
-if command -v pytest >/dev/null 2>&1; then
-  PYTEST_CMD=(pytest tests/ --collect-only -q)
-elif command -v python3 >/dev/null 2>&1 && python3 -m pytest --version >/dev/null 2>&1; then
-  PYTEST_CMD=(python3 -m pytest tests/ --collect-only -q)
-else
-  : > "$BASELINE_FILE"
-  echo "Baseline recorded: 0 tests (pytest unavailable)"
-  exit 0
+if [ ! -d "$TEST_DIR" ]; then
+    echo "# No tests directory — empty baseline" > "$BASELINE_FILE"
+    exit 0
 fi
 
-# pytest --collect-only -q emits one node id per line (containing `::`),
-# then a blank line and a summary like "170 tests collected in 0.05s".
-# Filter to lines containing `::` to keep only node ids.
-"${PYTEST_CMD[@]}" 2>/dev/null \
-  | grep -E '::' \
-  | sort -u > "$BASELINE_FILE"
-
-count="$(wc -l < "$BASELINE_FILE" | tr -d ' ')"
-echo "Baseline recorded: $count tests"
+# Test node IDs contain "::" in pytest; CUSTOMIZE the filter for another runner.
+( cd "$PROJ" && eval "$BASELINE_COLLECT_CMD" 2>/dev/null ) | grep "::" > "$BASELINE_FILE" || true
+COUNT=$(wc -l < "$BASELINE_FILE" | tr -d ' ')
+echo "Baseline recorded: $COUNT test(s)"
