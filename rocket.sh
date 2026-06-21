@@ -177,7 +177,12 @@ get_next_feature() {
         FORCE_FEATURE=""  # only force once
         return 0
     fi
-    while IFS='|' read -r _ num feature brief depends status _; do
+    # Queue schema: | # | Feature | Brief | Depends On | Spec | Status |
+    # `spec` is read but unused by the loop (the parser doesn't gate on it);
+    # it exists for human/agent audit so every row links back to its product
+    # spec section. Leaving it in the read pattern keeps `status` aligned with
+    # the trailing column.
+    while IFS='|' read -r _ num feature brief depends spec status _; do
         num=$(echo "$num" | xargs)
         depends=$(echo "$depends" | xargs)
         status=$(echo "$status" | xargs)
