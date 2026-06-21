@@ -139,3 +139,71 @@
 **Phase 6 — ship.** Recording now.
 
 **Pipeline health:** Clean Rocket run. Adversary debate caught the multi-hit-on-scalar-return collision-silencer bug at design time (would have shipped as a subtle silent-failure if the brief had been built verbatim). Code review iteration caught the dedupe bug that no first-pass test exercised. Both safety nets — adversary at design time and reviewer at code time — fired on real correctness bugs in this run. Queue: features 1–7 SHIPPED, 8–17 QUEUED.
+
+---
+
+## Run: 2026-06-14 (Rocket, autonomous)
+
+**Skill:** rocket (Autonomous Feature Build Loop)
+**Brief:** features/pipeline/pairwise-scoring.md
+**Hardened design:** features/_adversaries/pairwise-scoring.md
+**Build prompt:** features/_prompts/pairwise-scoring.cc-prompt.md
+**Branch:** feature/pairwise-scoring
+**Files created:** 3 (core/matching/scoring.py, core/matching/weights.py, tests/test_scoring.py)
+**Files modified outside the 3 new:** 2 source (core/matching/types.py +3 frozen dataclasses; core/graph/entity_store.py +4 read functions); logs/queue (FEATURE_QUEUE.md, SHIPPED.md, this file, CC-LEARNINGS.md, PROMPT_LOG.md)
+**Test count before:** 205
+**Test count after:** 234 (+29 new)
+**Adversaries:** 3 (design / skeptic / engineer) — all returned. Hardened design recorded ~20 explicit DECISIONS (cuts: name_inversion_score, email soft signal, shared-transaction-context signal; adds: clamp, evidence caps, profile_id debuggability, hygiene tests).
+**Review iterations:** 2 (first iter: 0 BLOCKING from QA + 2 BLOCKING + 8 WARNING from code review; QA green on both iters)
+**Fixer iterations:** 1
+**Outcome:** PASS / SHIPPED
+
+**Phase 1 — adversaries.** Skeptic flagged: (a) transactions table doesn't exist → shared-transaction-context signal unbuildable; (b) name-inversion 0.95 override double-counts Stage 0; (c) email +0.10 signal unreachable because Stage 1 already resolves email matches at 0.99; (d) score is unbounded (no clamp specified); (e) graph-neighborhood-overlap cap missing. Engineer dismissed phantom perf risks (~25K signal calls < 5s at V1 scale), agreed with skeptic on cuts (a)(b)(c), recommended split of WeightConfig (weights vs overrides). Design defended four RapidFuzz signals + n-gram Jaccard + category dispatch. Reconciliation: skeptic wins on cuts; explicit caps added (per-shared-person 0.05/max 0.10; per-neighbor 0.025/max 0.10); score clamped [0,1]; engineer wins on one-cell dispatch + default fallback.
+
+**Phase 2 — prompt.** SCOPE prompt with all 8 sections. 5 file paths, 9 brief acceptance criteria + 20 hardened-design test additions enumerated.
+
+**Phase 3 — build.** Created 3 new modules, appended to 2 existing. Mid-build: one synthesized-non-match test fixture failed because "Atlas Media Group" and "Meridian Capital Group" share "group" → added a shared-token filter so synthesized non-matches are token-disjoint (correctly leaves shared-noise-word pairs in the 0.50–0.70 SURFACE band where they belong). 234 green at first build commit (0e722f5).
+
+**Phase 4 iteration 1.** QA: PASS. Code review: FAIL — 2 BLOCKING + 8 WARNING. Blockers: (1) `get_aliases` returned rows where `value == canonical_name`, double-counting the perfect-match signal via alias_boost when the V1 canonical-write convention seeds a canonical-source alias; (2) `_check_psa_abbreviation` did not gate the candidate-side and alias-side shortcode branches on PSA-category, allowing accounting-side ≤4-char names to spuriously fire the bonus.
+
+**Phase 5 — fixer.** SQL-level filter on `get_aliases` (both tenant branches) + defensive guard in `_compute_alias_boost_fires` skipping `alias == candidate_name` (case-insensitive). `_check_psa_abbreviation` dropped `entity_source` kwarg; all three branches gated on category=="psa". Inversion test re-seeded with `"chen michael"` (token-reorder, ≠ canonical_name) so alias_boost still fires. `test_alias_boost_single_application` strengthened: candidate_name moved to mid-band so stacking would be observable below the clamp. Hygiene fence widened (+fastembed, sentence_transformers, torch, transformers). PEP 585 lowercase generics in weights.py. Two unused-import cleanups.
+
+**Phase 4 iteration 2.** QA: PASS. Code review: PASS. 0 BLOCKING, 0 WARNING new. 234 tests green.
+
+**Phase 6 — ship.** Recording now.
+
+**Pipeline health:** Clean run with one fixer iteration. The skeptic's design-time cuts (no transactions signal, no name-inversion override, no email soft signal) prevented ~3 dead-code paths from shipping; without those cuts the QA pass might have masked silent-zero behaviors. Code reviewer's blocking on `get_aliases` caught a silent double-count that QA missed — the inversion test was passing for the wrong reason (alias seeded equal to canonical_name). Both safety nets — adversary at design time, reviewer at code time — fired on real correctness bugs again this run. Queue: features 1–8 SHIPPED, 9–17 QUEUED.
+
+---
+
+## Run: 2026-06-20 (Rocket, autonomous; multi-session — paused 06-14, resumed 06-20)
+
+**Skill:** rocket (Autonomous Feature Build Loop)
+**Brief:** features/pipeline/threshold-llm-fallback.md
+**Hardened design:** features/_adversaries/threshold-llm-fallback.md
+**Build prompt:** features/_prompts/threshold-llm-fallback.cc-prompt.md
+**Branch:** feature/threshold-llm-fallback
+**Files created:** 6 (core/matching/{disposition,llm_fallback,redaction}.py, tests/test_{disposition,llm_fallback,redaction}.py)
+**Files modified outside the 6 new:** 2 source (core/matching/types.py +68L; core/graph/entity_store.py +56L); 2 SQL migrations (db/migrations/002_llm_training_data.{sql,sqlite.sql}); logs/queue (this RUN_LOG, FEATURE_QUEUE.md row 9→SHIPPED, SHIPPED.md, PROMPT_LOG.md, CC-LEARNINGS.md). RESUME_HERE.md DELETED at ship time per its own instructions.
+**Test count before:** 234
+**Test count after:** 316 (+82 new)
+**Adversaries:** 3 (design / skeptic / engineer)
+**Review iterations:** 1 (both reviewers PASS on first try; no fixer needed)
+**Fixer iterations:** 0
+**Outcome:** PASS / SHIPPED
+
+**Phase 1 — adversaries.** Reconciled to features/_adversaries/threshold-llm-fallback.md. Phase 1 cuts: per-call-tier escalation (kept single Claude API call instead of 3-model tier-escalator), redaction-time embedding hash (deferred V2+ once an embedding subsystem exists).
+
+**Phase 2 — prompt.** SCOPE prompt with all 8 sections at features/_prompts/threshold-llm-fallback.cc-prompt.md.
+
+**Phase 3 — build.** Commit 40e1335 (2026-06-14 22:33 EDT). 3 new modules + 1 entity_store helper (`are_clustered`) + 1 Postgres+SQLite migration + 3 test suites. 82 new tests, 316 full repo green at first build commit.
+
+**SESSION CUT 2026-06-14 22:36 EDT.** rocket.sh subprocess killed mid-Phase-4 review (no reviewer verdicts written yet). RESUME_HERE.md committed (2132945) describing exact state: Phases 1–3 complete, Phase 4+ pending; resume by spawning QA + code review against commit 40e1335 specifically.
+
+**Session bridge 2026-06-20:** Three intermediate PRs merged on main between pause and resume — (a) rocket-loop sync additions PR #3, (b) rocket-loop sync overwrites + DRIFTED files PR #4, (c) spec v4 retrofit PR #5 (pre-trained fastText V1-mandatory; row 8a added; FEATURE_ID_REGEX widened to `[0-9]+[a-z]?`), (d) Spec column added to FEATURE_QUEUE.md PR #6. Feature 9's branch merged main forward — two FEATURE_QUEUE.md/rocket.sh conflicts resolved by taking main's version (feature 9 had not legitimately changed either). 316 tests stayed green through both merges.
+
+**Phase 4 iteration 1 (resumed).** QA: PASS (316 tests passing, 82 new, full-suite regression-free; 3 advisory WARNINGs — missing dedicated unit test for `_AnthropicAdapter.assess` no-tool-use path, docstring literal `anthropic.Anthropic()` matching its own grep gate, V2+ Turkish-İ NFKC limitation). Code review: PASS (6 NITs, 0 BLOCKING — Postgres migration uses `DROP TABLE IF EXISTS CASCADE` while SQLite mirror uses safe `CREATE TABLE IF NOT EXISTS`; `_load_candidate_system_refs` doesn't take `tenant_id` though candidate is already tenant-validated by the caller; unused `from dataclasses import replace` import in test_llm_fallback.py; hard-coded model id `claude-sonnet-4-6` with no env override; silent `except ImportError: pass` on dotenv; no explicit SDK retry config).
+
+**Phase 6 — ship.** Recording now. Delete RESUME_HERE.md, update SHIPPED.md (NIT about destructive Postgres DROP captured in the notes for follow-up), flip FEATURE_QUEUE row 9 → SHIPPED, append CC-LEARNINGS, append PROMPT_LOG, commit, push.
+
+**Pipeline health:** Multi-session resume executed cleanly. The RESUME_HERE.md pattern from the 06-14 pause held up — Phase 1–3 artifacts on disk + the build commit + clear resume steps made Phase 4 a clean spawn of fresh reviewer contexts with no need to re-do upstream work. The adversary debate's design-time cuts (per-call-tier, redaction-time embedding hash) meant Phase 3 shipped a tighter contract than the brief proposed; reviewers found no real bugs. Queue: features 1–9 SHIPPED, 8a + 10–17 QUEUED. v4 retrofit (8a) is next; 10+ unblock once 8a is in.

@@ -229,3 +229,236 @@ def get_entity_category(
     if row is None:
         return None
     return row[0]
+
+
+# ---------------------------------------------------------------------------
+# Stage 3 reads (pairwise scoring)
+# ---------------------------------------------------------------------------
+
+
+def get_aliases(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> list[str]:
+    """Return every `entity_aliases.value` for this canonical.
+
+    The canonical's own `canonical_name` is NOT included — Stage 3
+    scores it separately as part of the weighted string-metric sum.
+    The V1 canonical-write convention seeds a `value == canonical_name`
+    alias (rules §3 example), so the exclusion is enforced at the SQL
+    layer via a JOIN against `canonical_entities` and a `value !=
+    canonical_name` filter. Tenant-scoped when `tenant_id` is set.
+    """
+    if tenant_id is None:
+        rows = conn.execute(
+            """
+            SELECT a.value
+              FROM entity_aliases AS a
+              JOIN canonical_entities AS c ON c.canonical_id = a.canonical_id
+             WHERE a.canonical_id = ?
+               AND a.value != c.canonical_name
+            """,
+            (canonical_id,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT a.value
+              FROM entity_aliases AS a
+              JOIN canonical_entities AS c ON c.canonical_id = a.canonical_id
+             WHERE a.canonical_id = ?
+               AND c.tenant_id = ?
+               AND a.value != c.canonical_name
+            """,
+            (canonical_id, tenant_id),
+        ).fetchall()
+    return [value for (value,) in rows if value]
+
+
+def get_canonical_name_and_category(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> Optional[tuple[str, str, str]]:
+    """Return `(canonical_name, entity_category, entity_type)` for
+    `canonical_id`, or None if absent (or out of tenant scope).
+    """
+    if tenant_id is None:
+        row = conn.execute(
+            """
+            SELECT canonical_name, entity_category, entity_type
+              FROM canonical_entities
+             WHERE canonical_id = ?
+            """,
+            (canonical_id,),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            """
+            SELECT canonical_name, entity_category, entity_type
+              FROM canonical_entities
+             WHERE canonical_id = ?
+               AND tenant_id = ?
+            """,
+            (canonical_id, tenant_id),
+        ).fetchone()
+    if row is None:
+        return None
+    return (row[0], row[1], row[2])
+
+
+def _neighbors(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    tenant_id: Optional[str],
+) -> set[str]:
+    """Return the set of canonical_ids that share an edge with
+    `canonical_id`, bidirectionally. Tenant filter applies to BOTH
+    endpoints when set."""
+    if tenant_id is None:
+        rows = conn.execute(
+            """
+            SELECT target_node FROM entity_edges WHERE source_node = ?
+            UNION
+            SELECT source_node FROM entity_edges WHERE target_node = ?
+            """,
+            (canonical_id, canonical_id),
+        ).fetchall()
+        return {nid for (nid,) in rows}
+
+    rows = conn.execute(
+        """
+        SELECT e.target_node
+          FROM entity_edges AS e
+          JOIN canonical_entities AS cs ON cs.canonical_id = e.source_node
+          JOIN canonical_entities AS ct ON ct.canonical_id = e.target_node
+         WHERE e.source_node = ?
+           AND cs.tenant_id = ?
+           AND ct.tenant_id = ?
+        UNION
+        SELECT e.source_node
+          FROM entity_edges AS e
+          JOIN canonical_entities AS cs ON cs.canonical_id = e.source_node
+          JOIN canonical_entities AS ct ON ct.canonical_id = e.target_node
+         WHERE e.target_node = ?
+           AND cs.tenant_id = ?
+           AND ct.tenant_id = ?
+        """,
+        (canonical_id, tenant_id, tenant_id, canonical_id, tenant_id, tenant_id),
+    ).fetchall()
+    return {nid for (nid,) in rows}
+
+
+def count_shared_person_neighbors(
+    conn: sqlite3.Connection,
+    source_canonical_id: Optional[str],
+    candidate_canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> int:
+    """Count canonical_ids of `entity_category='person'` that are
+    neighbors of BOTH endpoints via `entity_edges`. Returns 0 when
+    `source_canonical_id` is None (Stage 3 query side is typically
+    unresolved at scoring time)."""
+    if source_canonical_id is None:
+        return 0
+
+    src = _neighbors(conn, source_canonical_id, tenant_id)
+    cand = _neighbors(conn, candidate_canonical_id, tenant_id)
+    shared = src & cand
+    if not shared:
+        return 0
+
+    placeholders = ",".join("?" for _ in shared)
+    if tenant_id is None:
+        rows = conn.execute(
+            f"""
+            SELECT COUNT(*) FROM canonical_entities
+             WHERE entity_category = 'person'
+               AND canonical_id IN ({placeholders})
+            """,
+            tuple(shared),
+        ).fetchone()
+    else:
+        rows = conn.execute(
+            f"""
+            SELECT COUNT(*) FROM canonical_entities
+             WHERE entity_category = 'person'
+               AND tenant_id = ?
+               AND canonical_id IN ({placeholders})
+            """,
+            (tenant_id, *tuple(shared)),
+        ).fetchone()
+    return int(rows[0]) if rows else 0
+
+
+def count_shared_graph_neighbors(
+    conn: sqlite3.Connection,
+    source_canonical_id: Optional[str],
+    candidate_canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> int:
+    """Count distinct canonical_ids connected to BOTH endpoints via
+    `entity_edges`, bidirectionally. Returns 0 when
+    `source_canonical_id` is None."""
+    if source_canonical_id is None:
+        return 0
+    src = _neighbors(conn, source_canonical_id, tenant_id)
+    cand = _neighbors(conn, candidate_canonical_id, tenant_id)
+    return len(src & cand)
+
+
+# ---------------------------------------------------------------------------
+# Stage 4 reads (threshold / cluster conflict)
+# ---------------------------------------------------------------------------
+
+
+def are_clustered(
+    conn: sqlite3.Connection,
+    cid_a: str,
+    cid_b: str,
+    tenant_id: Optional[str] = None,
+) -> bool:
+    """Return True iff a SAME_AS edge exists between `cid_a` and `cid_b`
+    (in either direction) in `entity_edges`.
+
+    V1 has no Stage 6 (resolution / graph update) writes yet, so this
+    returns False for every production call — shipped now so Stage 6
+    can populate `entity_edges` rows with `relationship='SAME_AS'`
+    without revisiting Stage 4.
+
+    Tenant scoping: when `tenant_id` is set, BOTH endpoints must belong
+    to the tenant for the edge to count. A cross-tenant edge (which
+    shouldn't exist in V1 anyway) is ignored under a scoped query.
+    """
+    if cid_a == cid_b:
+        return False  # same canonical — not a conflict and not a cluster pair
+
+    if tenant_id is None:
+        row = conn.execute(
+            """
+            SELECT 1 FROM entity_edges
+             WHERE relationship = 'SAME_AS'
+               AND ((source_node = ? AND target_node = ?)
+                 OR (source_node = ? AND target_node = ?))
+             LIMIT 1
+            """,
+            (cid_a, cid_b, cid_b, cid_a),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            """
+            SELECT 1
+              FROM entity_edges AS e
+              JOIN canonical_entities AS cs ON cs.canonical_id = e.source_node
+              JOIN canonical_entities AS ct ON ct.canonical_id = e.target_node
+             WHERE e.relationship = 'SAME_AS'
+               AND cs.tenant_id = ?
+               AND ct.tenant_id = ?
+               AND ((e.source_node = ? AND e.target_node = ?)
+                 OR (e.source_node = ? AND e.target_node = ?))
+             LIMIT 1
+            """,
+            (tenant_id, tenant_id, cid_a, cid_b, cid_b, cid_a),
+        ).fetchone()
+    return row is not None

@@ -33,7 +33,7 @@
 
 [Measurable. Binary. No "improved" or "better" — state the threshold.]
 
-- [ ] [Criterion 1: e.g., "Auto-match rate ≥90% across both connected categories for ≥3 customers over 3 consecutive cycles"]
+- [ ] [Criterion 1: e.g., "Auto-match rate ≥95% across both connected categories for ≥3 customers over 3 consecutive cycles"]
 - [ ] [Criterion 2: e.g., "Zero false auto-approvals in production over 30 days"]
 - [ ] [Criterion 3: e.g., "P95 ingestion latency <5s for ≤500 entities"]
 
