@@ -207,3 +207,5 @@
 **Phase 6 — ship.** Recording now. Delete RESUME_HERE.md, update SHIPPED.md (NIT about destructive Postgres DROP captured in the notes for follow-up), flip FEATURE_QUEUE row 9 → SHIPPED, append CC-LEARNINGS, append PROMPT_LOG, commit, push.
 
 **Pipeline health:** Multi-session resume executed cleanly. The RESUME_HERE.md pattern from the 06-14 pause held up — Phase 1–3 artifacts on disk + the build commit + clear resume steps made Phase 4 a clean spawn of fresh reviewer contexts with no need to re-do upstream work. The adversary debate's design-time cuts (per-call-tier, redaction-time embedding hash) meant Phase 3 shipped a tighter contract than the brief proposed; reviewers found no real bugs. Queue: features 1–9 SHIPPED, 8a + 10–17 QUEUED. v4 retrofit (8a) is next; 10+ unblock once 8a is in.
+| 2026-06-21T00:25:10 | 8a | GUARD | rocket | reverted out-of-lane mutation by code-review |
+| 2026-06-21T00:25:10 | 8a | BLOCKED | — | reviews still FAIL after 3 fix rounds |

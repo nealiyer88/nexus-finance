@@ -5,3 +5,6 @@
 | Date | Feature | Branch | Error Summary | Retry Count | Last Commit | Status |
 |------|---------|--------|---------------|-------------|-------------|--------|
 | | | | | | | |
+## 2026-06-21T00:25:10 — 8a BLOCKED
+Reason: reviews still FAIL after 3 fix rounds
+
