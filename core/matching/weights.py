@@ -58,7 +58,7 @@ PSA_ACCOUNTING_WEIGHTS: WeightConfig = WeightConfig(
     ngram_jaccard=0.10,
     alias_boost=0.15,
     abbreviation_bonus=0.20,
-    fasttext_cosine=0.20,
+    fasttext_cosine=0.35,
     profile_id="psa_accounting_v1",
 )
 

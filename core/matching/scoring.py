@@ -294,16 +294,21 @@ def _compute_graph_evidence(
 
 def _compute_b_boosts(evidence: GraphEvidence) -> tuple[SignalBoost, ...]:
     boosts = []
-    raw_b1 = evidence.shared_person_bonus
-    raw_b6 = evidence.neighborhood_overlap_bonus
     remaining = B_SIGNAL_CAP
-    applied_b1 = min(raw_b1, remaining)
-    remaining -= applied_b1
-    applied_b6 = min(raw_b6, remaining)
-    if raw_b1 > 0.0 or applied_b1 > 0.0:
-        boosts.append(SignalBoost(signal_id="B1", raw=raw_b1, applied=applied_b1))
-    if raw_b6 > 0.0 or applied_b6 > 0.0:
-        boosts.append(SignalBoost(signal_id="B6", raw=raw_b6, applied=applied_b6))
+
+    def _apply(signal_id: str, raw: float) -> None:
+        nonlocal remaining
+        applied = min(raw, remaining)
+        remaining -= applied
+        if raw > 0.0 or applied > 0.0:
+            boosts.append(SignalBoost(signal_id=signal_id, raw=raw, applied=applied))
+
+    _apply("B1", evidence.shared_person_bonus)
+    _apply("B2", evidence.project_code_bonus)
+    _apply("B3", evidence.amount_cooccurrence_bonus)
+    _apply("B4", evidence.shared_email_domain_bonus)
+    _apply("B5", evidence.temporal_cooccurrence_bonus)
+    _apply("B6", evidence.neighborhood_overlap_bonus)
     return tuple(boosts)
 
 

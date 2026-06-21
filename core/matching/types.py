@@ -80,6 +80,14 @@ class GraphEvidence:
     shared_person_bonus: float
     neighborhood_overlap_count: int
     neighborhood_overlap_bonus: float
+    project_code_fragment_count: int = 0
+    project_code_bonus: float = 0.0
+    amount_cooccurrence_count: int = 0
+    amount_cooccurrence_bonus: float = 0.0
+    shared_email_domain_count: int = 0
+    shared_email_domain_bonus: float = 0.0
+    temporal_cooccurrence_count: int = 0
+    temporal_cooccurrence_bonus: float = 0.0
 
 
 @dataclass(frozen=True)

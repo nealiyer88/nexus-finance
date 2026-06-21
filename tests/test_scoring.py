@@ -856,10 +856,10 @@ def test_fasttext_signal_c_abbreviation_lift(
     import core.matching.scoring as scoring_mod
     monkeypatch.setattr(scoring_mod, "embed", stub_embed)
 
-    # "pacrim tech" vs "pacrim technologies": base=0.658, +ft(0.9,w=0.20)=0.838 (crosses 0.70)
-    # "meridian cap" vs "meridian capital group": base=0.665, +ft=0.845 (crosses 0.70)
+    # "pacrim tech" vs "pacific rim technologies international": base≈0.434, +ft(0.9,w=0.35)≈0.749 (crosses 0.70)
+    # "meridian cap" vs "meridian capital group": base≈0.665, +ft(0.9,w=0.35)≈0.980 (crosses 0.70)
     pairs = [
-        ("pacrim tech", "pacrim technologies"),
+        ("pacrim tech", "pacific rim technologies international"),
         ("meridian cap", "meridian capital group"),
     ]
     for entity_name, candidate_name in pairs:
@@ -943,17 +943,25 @@ def test_fasttext_signal_c_negative_control(
 
 
 def test_signal_b_cap_clips_excess() -> None:
+    # B1=0.10, B2=0.08, B4=0.05, B6=0.10 → raw sum=0.33 > cap=0.20
+    # B1 applied=0.10, B2 applied=0.08, B4 applied=0.02 (clipped), B6 applied=0.00 (fully clipped)
     evidence = GraphEvidence(
         shared_person_count=3,
-        shared_person_bonus=0.15,
+        shared_person_bonus=0.10,
         neighborhood_overlap_count=4,
         neighborhood_overlap_bonus=0.10,
+        project_code_bonus=0.08,
+        shared_email_domain_bonus=0.05,
     )
     boosts = _compute_b_boosts(evidence)
     total = sum(b.applied for b in boosts)
     assert pytest.approx(total, abs=1e-9) == B_SIGNAL_CAP
+    assert len(boosts) >= 4
+    b4 = next(b for b in boosts if b.signal_id == "B4")
+    assert pytest.approx(b4.applied, abs=1e-9) == 0.02
+    assert pytest.approx(b4.raw, abs=1e-9) == 0.05
     b6 = next(b for b in boosts if b.signal_id == "B6")
-    assert pytest.approx(b6.applied, abs=1e-9) == 0.05
+    assert pytest.approx(b6.applied, abs=1e-9) == 0.00
     assert pytest.approx(b6.raw, abs=1e-9) == 0.10
 
 
