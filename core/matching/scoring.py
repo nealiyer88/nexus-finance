@@ -308,7 +308,7 @@ def _compute_b_boosts(evidence: GraphEvidence) -> tuple[SignalBoost, ...]:
 
 
 def _weighted_score(
-    weights: WeightConfig, breakdown: SignalBreakdown, evidence: GraphEvidence
+    weights: WeightConfig, breakdown: SignalBreakdown
 ) -> float:
     """Combine weighted signals + bonuses + evidence; clamp to [0, 1]."""
     weighted_sum = (
@@ -382,7 +382,7 @@ def score_pair(
     )
     b_boosts = _compute_b_boosts(evidence)
     breakdown = dataclasses.replace(breakdown, b_signal_boosts=b_boosts)
-    score = _weighted_score(weights, breakdown, evidence)
+    score = _weighted_score(weights, breakdown)
     return ScoredMatch(
         canonical_id=candidate_id,
         score=score,

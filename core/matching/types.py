@@ -9,7 +9,7 @@ overlapping result types.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional, Tuple
+from typing import Literal, Optional
 
 
 MatchKeyType = Literal["alias_exact", "email", "employee_id"]
@@ -64,7 +64,7 @@ class SignalBreakdown:
     alias_boost_fired: bool
     abbreviation_bonus_fired: bool
     fasttext_cosine: Optional[float] = None
-    b_signal_boosts: Tuple["SignalBoost", ...] = ()
+    b_signal_boosts: tuple[SignalBoost, ...] = ()
 
 
 @dataclass(frozen=True)

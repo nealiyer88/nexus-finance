@@ -16,7 +16,7 @@ _logger = logging.getLogger(__name__)
 _MODEL = None
 _MODEL_LOAD_ATTEMPTED = False
 
-_REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 _MODEL_PATH = _REPO_ROOT / "models" / "cc.en.300.bin"
 
 

@@ -516,11 +516,6 @@ def test_fixture_end_to_end_each_canonical_reachable(conn: sqlite3.Connection) -
 # ---------------------------------------------------------------------------
 
 
-def _load_stub_vectors() -> dict[str, list[float]]:
-    stub_path = REPO_ROOT / "tests" / "fixtures" / "stub_vectors.json"
-    return json.loads(stub_path.read_text())
-
-
 def test_stage_2c_embedding_surfaces_abbreviation_candidate(
     conn: sqlite3.Connection,
 ) -> None:

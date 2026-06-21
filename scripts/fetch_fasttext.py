@@ -28,10 +28,8 @@ _CC_EN_300_URL = (
     "https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.en.300.bin.gz"
 )
 
-# SHA256 of the raw .bin.gz file from fastText (verified 2026-06-20)
-_CC_EN_300_GZ_SHA256 = (
-    "f8759065c9b9e8dc3e37e9b3b4c1af6a0ace93c8ff4e5ef2e9e9e5c9b7b2a4d"
-)
+# SHA256 placeholder — replace with verified value after first download.
+_CC_EN_300_GZ_SHA256 = "0" * 64
 
 
 def _sha256(path: pathlib.Path) -> str:
@@ -53,6 +51,11 @@ def main() -> None:
     print(f"Downloading {_CC_EN_300_URL} ...")
     urllib.request.urlretrieve(_CC_EN_300_URL, gz_path)
     print(f"Saved to {gz_path}")
+    actual_sha = _sha256(gz_path)
+    if actual_sha != _CC_EN_300_GZ_SHA256:
+        gz_path.unlink()
+        print(f"SHA256 mismatch: got {actual_sha}", file=sys.stderr)
+        sys.exit(1)
 
     import gzip
     import shutil
