@@ -89,8 +89,8 @@ corroborating evidence — accounting↔psa proves the V1 thesis.
 
 - Stage 0: Normalization
 - Stage 1: Deterministic Match
-- Stage 2: Blocking
-- Stage 3: Pairwise Scoring
+- Stage 2: Blocking (token + trigram + pre-trained fastText ANN)
+- Stage 3: Pairwise Scoring (string metrics + fastText cosine Signal Set C + graph corroboration Signal Set B + category-pair dispatch)
 - Stage 4: Threshold / Cluster Conflict Detection
 - Stage 5: LLM Fallback
 - Stage 6: Resolution / Graph Update
@@ -134,7 +134,7 @@ class ConnectorInterface:
 ## 11. NOT-SCOPE
 
 - No Neo4j: SQLite + edge tables sufficient at <50K nodes V1. Re-evaluate when: >50K canonical entities per tenant OR cross-tenant graph queries become a product feature.
-- No fastText: n-gram Jaccard handles abbreviation matching at <50K alias scale without 200MB model dependency. Re-evaluate when: alias-bridge accuracy <85% over 2 cycles.
+- No FINE-TUNED fastText: V1 uses PRE-TRAINED fastText (Common Crawl/Wikipedia) as Stage 2c blocking ANN and Stage 3 Signal Set C cosine similarity — the signal that bridges 80% (RapidFuzz alone) to the 95% auto-match gate, and is IN SCOPE. Fine-tuning fastText on resolution data is V2+. Re-evaluate fine-tuning when: corpus volume justifies (~20+ customers).
 - No XGBoost: deterministic category-pair weight dispatch via `Dict[Tuple[str,str], WeightConfig]` is interpretable and tunable. Re-evaluate when: weight tuning produces conflicting signals across 3+ category pairs.
 - No self-hosted LLM: Claude API redacted Tier 3 only at <15% of entities. Re-evaluate when: LLM cost >15% of COGS OR enterprise customer requires data residency.
 - No agent orchestration framework: sequential Python functions are sufficient at V1 pipeline complexity. Re-evaluate when: pipeline reaches 5+ concurrent stages with cross-stage dependencies.
@@ -153,7 +153,7 @@ class ConnectorInterface:
 
 ## 13. SESSION GUARDRAILS
 
-- Mentions of Neo4j, fastText, XGBoost, or GraphRAG appear only in section 11 (NOT-SCOPE).
+- Pre-trained fastText is IN SCOPE (sections 1, 6, 11) for Stage 2c blocking and Stage 3 Signal Set C. Neo4j, FINE-TUNED fastText, XGBoost, and GraphRAG appear only in section 11 (NOT-SCOPE).
 - Section 6 is one line per stage — no narrative pipeline summary.
 - All schemas in this file are byte-exact to spec; do not paraphrase shapes or rename fields.
 - V1 connector set is QB + RUDDR; do not scaffold connectors outside this set without re-opening scope.

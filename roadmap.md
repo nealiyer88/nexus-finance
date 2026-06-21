@@ -54,7 +54,7 @@ Status column in roadmap.md to SHIPPED.
 
 **Why first:** Unlocks the third system category. QB (accounting) + RUDDR (PSA) + Bill.com (AP) = three-category identity graph. Demonstrates the within-customer network effect — each additional category multiplies resolution surface. Also unlocks "integration readiness" GTM motion.
 
-**Dependency:** V1 shipped, ≥3 customers sustaining ≥90% auto-match across QB + RUDDR for 3 consecutive cycles.
+**Dependency:** V1 shipped, ≥3 customers sustaining ≥95% auto-match across QB + RUDDR for 3 consecutive cycles.
 
 ### 2. Stripe Connector (Payments Category)
 
@@ -99,7 +99,7 @@ Each phase depends on prior phase proven in production. No skipping.
 
 | Phase | Feature | Success Gate |
 |-------|---------|-------------|
-| 1 | Cross-Category Entity Resolution | ≥90% auto-match, 3 customers, 3 cycles, across both categories |
+| 1 | Cross-Category Entity Resolution | ≥95% auto-match, 3 customers, 3 cycles, across both categories |
 | 2 | AR/AP Reconciliation | ≥98% accuracy, 3 customers, 2 cycles |
 | 3 | Cash Flow Forecasting | Per-entity payment cadence + labor-revenue lag. Rolling 13-week model. |
 | 4 | P&L Intelligence | Cross-category variance attribution |

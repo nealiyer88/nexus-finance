@@ -46,3 +46,20 @@ A boost-applies-at-most-once test cannot use a perfect-match candidate name: the
 The PSA-shortcode heuristic was originally described in the brief in one English sentence ("if candidate ≤4 chars from PSA, check abbreviation of incoming name"). Hardened design pinned the exact algorithm: (i) gate on category pair, (ii) identify shortcode side by category+length, (iii) match via prefix-of-token OR initialism. The build prompt's `_check_psa_abbreviation` reads as a direct translation. Pattern: ambiguous English in a brief → step-numbered pseudocode in the hardened design → near-mechanical Python implementation. Reviewer-flagged-bugs in this section dropped to 1 (the PSA-category gating on candidate side).
 
 ---
+
+## 2026-06-20 — threshold-llm-fallback (Rocket, multi-session resume)
+
+### TRICK — RESUME_HERE.md as session-bridge marker
+Feature 9 paused after Phase 3 build commit with a deliberate RESUME_HERE.md committed to the branch — full state inventory + exact resume steps + delete-at-ship instruction. Six days later, fresh reviewer subagents picked up at Phase 4 with zero re-do work. The note's self-delete clause prevents it from outliving its purpose. Pattern reusable for any multi-session Rocket build.
+
+### WORKED — Phase-4 reviewers spawned against an explicit build commit, not a branch diff
+Resumed session passed `40e1335` (the build commit hash) into both reviewer prompts as the diff scope. The branch carried infrastructure merges (rocket-loop sync, v4 spec retrofit, Spec column) inherited via main-merges between pause and resume — narrowing to the build-commit-only diff kept reviewer focus on feature 9's code, not 30 files of unrelated infra deltas. Pattern: when resuming a paused branch, always give reviewers the precise hash range, not `main..HEAD`.
+
+### WORKED — Default-deny redaction signatures (skeptic-driven)
+`redact_org` / `redact_person` accept only allow-listed primitives — `category`, `entity_type`, shaped codes, role strings, counts, score, `forbidden_tokens`. No `NormalizedEntity`, no `raw_record`, no `dict`. Code review confirmed: architecturally impossible to leak PII via these functions because the type signatures don't permit it. Pattern: when a function MUST NOT leak something, encode that prohibition in the signature, not in the body.
+
+### TRICK — Pre-send AND post-response leak checks
+`leak_check` runs twice — once on the redacted prompt before the API call (defense in depth against future code changes), once on the LLM's `reasoning` field after the response. Out-of-bound text from the model gets replaced with `REDACTED_REASONING_PLACEHOLDER` and the scrubbed reasoning is what persists to the training-data row. The persisted DB row therefore contains audit-safe text regardless of model misbehavior.
+
+### FAILED — Postgres migration uses destructive `DROP TABLE IF EXISTS CASCADE`
+`db/migrations/002_llm_training_data.sql:14` opens with `DROP TABLE IF EXISTS llm_training_data CASCADE` while the SQLite mirror (`002_llm_training_data_sqlite.sql`) uses safe `CREATE TABLE IF NOT EXISTS`. Append-only audit log contract (rule §10) is undermined if a dev re-runs migration 002 manually. Captured as a follow-up nit in SHIPPED.md; should be normalized to additive pattern in next infra pass.

@@ -41,3 +41,22 @@ this file. Counts and filenames only.
 **Outcome:** PASS / SHIPPED
 
 ---
+
+## 2026-06-20 — Rocket ship of feature 9 (threshold-llm-fallback, resumed from 06-14)
+
+**Skill:** rocket (Autonomous Feature Build Loop)
+**Brief:** features/pipeline/threshold-llm-fallback.md
+**Hardened design:** features/_adversaries/threshold-llm-fallback.md
+**Build prompt:** features/_prompts/threshold-llm-fallback.cc-prompt.md
+**Branch:** feature/threshold-llm-fallback
+**Files created:** 6 (3 source modules + 3 test files); 2 migrations; 2 source files appended.
+**Files modified outside the 6 new:** 2 source touches (types.py +68L, entity_store.py +56L); 5 logs/queue (this file, FEATURE_QUEUE.md row 9, SHIPPED.md, RUN_LOG.md, CC-LEARNINGS.md); RESUME_HERE.md DELETED at ship.
+**Test count before:** 234
+**Test count after:** 316 (+82 new)
+**Adversaries:** 3 (design / skeptic / engineer)
+**Review iterations:** 1 (PASS first try)
+**Fixer iterations:** 0
+**Outcome:** PASS / SHIPPED
+**Session continuity:** Build commit 40e1335 made 2026-06-14; review + ship completed 2026-06-20 across the rocket-loop sync + v4 spec retrofit + Spec-column schema PRs (#3–#6).
+
+---
