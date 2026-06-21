@@ -63,3 +63,49 @@ Resumed session passed `40e1335` (the build commit hash) into both reviewer prom
 
 ### FAILED — Postgres migration uses destructive `DROP TABLE IF EXISTS CASCADE`
 `db/migrations/002_llm_training_data.sql:14` opens with `DROP TABLE IF EXISTS llm_training_data CASCADE` while the SQLite mirror (`002_llm_training_data_sqlite.sql`) uses safe `CREATE TABLE IF NOT EXISTS`. Append-only audit log contract (rule §10) is undermined if a dev re-runs migration 002 manually. Captured as a follow-up nit in SHIPPED.md; should be normalized to additive pattern in next infra pass.
+
+## 2026-06-21 — 8a fasttext-signal-retrofit BLOCKED (Rocket, multi-iteration deadlock)
+
+Multi-session Rocket run launched 2026-06-20 22:25 from `main` for features 8a → 10 → 11. 8a deadlocked after the maximum 3 review→fix iterations (QA=PASS / Code=FAIL on final round). Features 10 and 11 never ran. Total spend: $15.25 (under $50 cap). Recovery branch pushed at `origin/feature/8a-blocked` for forensics.
+
+### FAILED — Rocket loop deadlock: QA reviewed against the brief, code review enforced the build prompt
+The brief (`features/pipeline/fasttext-signal-retrofit.md`) mandated all six B1–B6 signals per v4 spec §9. The Phase 1 reconcile produced a build prompt that explicitly deferred B2–B5 to "feature 8b" with the NON-GOAL: "no stubs, no placeholders, no `_ZERO_EVIDENCE`-shaped scaffolding." Then:
+
+1. QA round 1 read the **brief** and flagged "Signal Set B incomplete — only B1+B6 of B1–B6 implemented."
+2. Fixer added scaffold fields (`project_code_bonus`, `amount_cooccurrence_bonus`, `shared_email_domain_bonus`, `temporal_cooccurrence_bonus`) — empty data slots, always 0.
+3. Code review caught the scaffolds violated the build prompt's NON-GOAL and BLOCKED.
+4. Loop deadlocked because the brief and the prompt disagreed.
+
+**Mitigation:** the brief and the hardened design must be reconciled BEFORE Phase 3 build. If the hardened design needs to cut scope the brief mandates, the brief must be amended (or split into a primary + a follow-up) before the build prompt is finalized. The reconcile-document is currently advisory; in a future Rocket revision it should be authoritative — QA reviewer reads from `_adversaries/{slug}-hardened.md`, not from the original brief.
+
+### FAILED — Launched rocket.sh from `main` → 3 commits landed directly on `main`
+The new rocket.sh (upstream rocket-loop, post-sync) treats "the current branch IS the working branch" and commits build / fix artifacts directly there. No per-feature branch is auto-created. I launched from main, so commits `9653d7e` (build), `93c98ba` (fix), and `31d16d1` (fix) landed on local main — a violation of CLAUDE.md's "feature branches only, never commit directly to main" rule. Origin/main was untouched (none pushed), recoverable. Reset local main to origin/main; commits moved to `feature/8a-blocked`.
+
+**Mitigation:** always launch rocket.sh from a dedicated branch, e.g. `git checkout -b rocket-run-<features>` before `bash rocket.sh`. Consider adding a rocket.sh guard that refuses to run on the default branch (`main`/`master`).
+
+### FAILED — Reviewer agents repeatedly mutate the repo despite read-only intent
+Across 10 review calls (5 QA + 5 code) over 3 fix iterations, the repo-mutation guard fired EVERY single time — both reviewers wrote files or committed despite being launched with `--allowedTools Read Bash Grep Glob` and no write tools. The Layer-2 git-based guard (`guard_snapshot` / `guard_revert`) correctly reverted each mutation. Forensic record in `features/REVIEW_OVERRIDES.md`.
+
+**Mitigation:** the upstream rocket-loop reviewer agent definitions need to be tightened to genuinely behave read-only. The guard's existence is a good belt-and-suspenders backup but should not be the only line of defense. Worth filing upstream.
+
+### TRICK — `features/_logs/*.log` files are stderr captures; emptiness = clean
+`rocket.sh` line 149: `eval "$cmd" < "$pf" > "$tmp" 2>"$log_dest"`. The `.log` file is the stderr capture. When a `claude` CLI call runs without warnings, stderr is empty. The actual outputs live in sibling files:
+- adversary outputs → `features/_adversaries/<slug>-{design,skeptic,engineer,hardened}.md`
+- prompt → `features/_prompts/<slug>.cc-prompt.md`
+- build → `features/_logs/<slug>-build-{diff.patch,manifest.md}` + `<slug>-prebuild-sha.txt`
+- verdicts → `features/_logs/<slug>-{qa,code,review}-verdict.md`
+- fix → `features/_logs/<slug>-fix-report.md`
+- test run → `features/_logs/<slug>-pytest.log`
+
+If you see a non-empty `.log` file, it's a real warning/error worth reading.
+
+### FAILED — rocket.sh's queue status flip uses `sed -i` syntax that breaks on macOS BSD sed
+On 8a BLOCK, rocket.sh tried to update `FEATURE_QUEUE.md` row 8a `QUEUED → BLOCKED` but emitted: `sed: 1: "/^| 8a /{s/ QUEUED / BL ...": bad flag in substitute command: '}'`. The script's own `_sed_inplace` helper exists (and is portable across GNU + BSD), but the do_block code path apparently doesn't use it. Lingers a `FEATURE_QUEUE.md.sedtmp` file. Row 8a stays as QUEUED until manually flipped.
+
+**Mitigation:** patch the BLOCKED-row update to use `_sed_inplace`. Worth filing upstream.
+
+### WORKED — Heed the spec when rocket deadlocks; don't strip features to make it pass
+When the rocket loop deadlocked on 8a, the natural reaction was to ship a smaller version (strip B2–B5). The correct response — flagged by the user — is to heed the spec. v4 spec §9 made all 6 B-signals the *moat*: the layer that proves cross-category resolution is more than fuzzy string matching. Shipping 2 of 6 ships the opposite of the moat. The right path is to rewrite the brief so the deferred work is honest (B3 truly needs a transactions table; B2, B4, B5 do not — they use existing schema), then re-run rocket against the corrected brief. **Loop deadlock is a brief-clarity bug, not a "ship less" signal.**
+
+### TRICK — Treat `features/REVIEW_OVERRIDES.md` as a forensic audit log
+rocket.sh appends one entry every time a guard reverts a reviewer/gate mutation. Each entry records timestamp, slug, role, and the SHA reverted to. After a BLOCK, this file tells you exactly how chaotic the review loop got. In this run: 10 entries across 3 iterations — confirms reviewer agents are not respecting their read-only contract.
