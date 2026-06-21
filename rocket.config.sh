@@ -21,8 +21,10 @@ FEATURE_BUDGET_USD=50
 
 # ── Queue + feature selection ─────────────────────────────────────────────────
 QUEUE_FILE="FEATURE_QUEUE.md"
-# Nexus uses plain integer feature IDs (1, 2, ..., 17). Tighten to numbers only.
-FEATURE_ID_REGEX='[0-9]+'
+# Nexus uses integer feature IDs with an optional lowercase suffix for sub-features
+# (1, 2, ..., 8, 8a, 9, ..., 17). The suffix lets a retrofit / patch feature land
+# between the integer it amends and the next one without renumbering downstream.
+FEATURE_ID_REGEX='[0-9]+[a-z]?'
 MAX_FEATURES=3
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
