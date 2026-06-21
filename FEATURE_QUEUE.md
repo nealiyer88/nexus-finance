@@ -15,7 +15,7 @@
 | 5 | qb-connector | features/connectors/qb-connector.md | 3, 4 | v3 | SHIPPED |
 | 6 | ruddr-connector | features/connectors/ruddr-connector.md | 3, 4 | v3 | SHIPPED |
 | 7 | deterministic-blocking | features/pipeline/deterministic-blocking.md | 4, 5, 6 | v3 (retrofit by 8a) | SHIPPED |
-| 8 | pairwise-scoring | features/pipeline/pairwise-scoring.md | 7 | v3 (retrofit by 8a) | QUEUED |
+| 8 | pairwise-scoring | features/pipeline/pairwise-scoring.md | 7 | v3 (retrofit by 8a) | SHIPPED |
 | 8a | fasttext-signal-retrofit | features/pipeline/fasttext-signal-retrofit.md | 7, 8 | v4 §5,9,17 | QUEUED |
 | 9 | threshold-llm-fallback | features/pipeline/threshold-llm-fallback.md | 8 | v3 (unaffected by v4) | SHIPPED |
 | 10 | resolution-graph-update | features/pipeline/resolution-graph-update.md | 9 | v4 | QUEUED |
