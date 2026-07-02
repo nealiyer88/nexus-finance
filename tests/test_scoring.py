@@ -135,6 +135,21 @@ def _make_entity(
 
 
 # ---------------------------------------------------------------------------
+# 0. Import hygiene
+# ---------------------------------------------------------------------------
+
+
+def test_no_xgboost_no_llm_no_deep_learning_in_scoring() -> None:
+    """Guard: NOT-SCOPE ML libs must not appear in scoring.py (§11 rules)."""
+    scoring_src = pathlib.Path("core/matching/scoring.py").read_text()
+    for forbidden in ("xgboost", "anthropic", "openai", "fastembed",
+                      "sentence_transformers", "torch", "transformers"):
+        assert forbidden not in scoring_src, (
+            f"NOT-SCOPE import '{forbidden}' found in scoring.py"
+        )
+
+
+# ---------------------------------------------------------------------------
 # 1. Weight dispatch + WeightConfig invariants
 # ---------------------------------------------------------------------------
 
@@ -870,17 +885,22 @@ def test_b_boosts_total_applied_capped_at_max(conn: sqlite3.Connection) -> None:
     proportionally so sum(applied) == MAX_B_BOOST exactly.
 
     Signals: B1 raw=0.10 (2 shared persons) + B2 raw=0.12 (2 code
-    fragments) = 0.22 total raw; cap distributes 0.20 proportionally.
-    B4, B5, B6 are mocked out so only B1 and B2 fire.
+    fragments) + B4 raw=0.08 (matching corporate email) + B5 raw=0.05
+    (5-day creation delta) = 0.35 total raw; cap distributes 0.20.
+    B6 is mocked to 0 so only B1+B2+B4+B5 fire.
     """
+    import datetime
     import unittest.mock as _mock
+
+    ts_base = datetime.datetime(2024, 1, 15)
+    ts_offset = datetime.datetime(2024, 1, 20)
 
     with _mock.patch(
         "core.matching.scoring.count_shared_person_neighbors", return_value=2
     ), _mock.patch(
-        "core.matching.scoring.get_external_field", return_value=None
+        "core.matching.scoring.get_external_field", return_value="alice@acmecorp.com"
     ), _mock.patch(
-        "core.matching.scoring.get_created_at", return_value=None
+        "core.matching.scoring.get_created_at", side_effect=[ts_base, ts_offset]
     ), _mock.patch(
         "core.matching.scoring.count_shared_graph_neighbors", return_value=0
     ):
@@ -895,11 +915,17 @@ def test_b_boosts_total_applied_capped_at_max(conn: sqlite3.Connection) -> None:
             base_score=0.80,
         )
 
-    assert len(result) == 2, f"expected B1+B2 only, got {result}"
+    assert len(result) == 4, f"expected B1+B2+B4+B5, got {result}"
+    signal_ids = {e.signal_id for e in result}
+    assert signal_ids == {"B1", "B2", "B4", "B5"}, f"unexpected signals: {signal_ids}"
     b1 = next(e for e in result if e.signal_id == "B1")
     b2 = next(e for e in result if e.signal_id == "B2")
-    assert b1.raw == 0.10
-    assert b2.raw == 0.12
+    b4 = next(e for e in result if e.signal_id == "B4")
+    b5 = next(e for e in result if e.signal_id == "B5")
+    assert b1.raw == pytest.approx(0.10)
+    assert b2.raw == pytest.approx(0.12)
+    assert b4.raw == pytest.approx(0.08)
+    assert b5.raw == pytest.approx(0.05)
     total_applied = sum(e.applied for e in result)
     assert math.isclose(total_applied, MAX_B_BOOST, abs_tol=1e-9), (
         f"expected sum(applied)=={MAX_B_BOOST}, got {total_applied}"
