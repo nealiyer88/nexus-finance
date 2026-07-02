@@ -377,6 +377,8 @@ def test_embedding_stage_2c_surfaces_candidate(
 
     Uses 'lais corp' (query) vs 'luminos artificial intelligence systems'
     (canonical) — no shared tokens or trigrams, so only Stage 2c can surface it.
+    (Brief AC-9 names 'pacrim tech'/'pacific rim technologies international' as
+    the illustrative pair; both pairs prove the same zero-overlap mechanism.)
     """
     _insert_canonical(conn, "CAN-EMB", "luminos artificial intelligence systems")
     _insert_sysref(conn, "CAN-EMB", "ruddr", "psa", "RUDDR-EMB", {})
