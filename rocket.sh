@@ -40,6 +40,7 @@ done
 : "${QUEUE_FILE:=FEATURE_QUEUE.md}"
 : "${FEATURE_ID_REGEX:=[A-Za-z0-9]+}"
 : "${MAX_FEATURES:=3}"
+: "${LIVE_HEARTBEAT_SECS:=300}"      # ROCKET_LIVE.md status pulse cadence; 0 disables
 : "${TEST_CMD:=python -m pytest tests/ -x --tb=short}"
 : "${ROCKET_BRANCH_DEFAULT:=main}"
 : "${GUARD_CLEAN_PATHS:=}"
@@ -580,6 +581,37 @@ PYEOF
     git commit -q -m "ship: ${slug} — rocket (reviews PASS)" || true
     run_post_ship_hook "$slug"   # optional: bring shipped code live, etc.
 }
+
+# ── Live heartbeat ────────────────────────────────────────────────────────────
+# Long phases (a single build/fix agent call can run 30+ min) emit no narrate()
+# events, leaving ROCKET_LIVE.md silent. This background loop appends an aggregate
+# status pulse every LIVE_HEARTBEAT_SECS (default 300s; 0 disables) so the live log
+# never goes quiet longer than one interval. Aggregate-only per the LIVE_LOG header
+# rule: phase labels, counts, commit hashes — no identifiers, no dollar amounts.
+# Reads the slug/step from RUN_LOG.md's last row (the subshell forks before SLUG is
+# set per-feature, so parent globals can't be trusted here).
+_heartbeat_loop() {
+    while :; do
+        sleep "$LIVE_HEARTBEAT_SECS"
+        local lastrow slug laststep dirty lastc
+        lastrow=$(tail -1 features/RUN_LOG.md 2>/dev/null)
+        slug=$(echo "$lastrow" | cut -d'|' -f3 | tr -d ' ' | tr '[:lower:]' '[:upper:]')
+        laststep=$(echo "$lastrow" | cut -d'|' -f4,6 | tr -s ' ')
+        dirty=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+        lastc=$(git log -1 --format='%h %s' 2>/dev/null)
+        { echo ""
+          echo "### $(ts) · ${slug:-—} · 💓 heartbeat"
+          echo ""
+          echo "Run alive. Last logged step:${laststep:- (none yet)}. Working tree: ${dirty} changed path(s). Last commit: \`${lastc}\`."
+        } >> "$LIVE_LOG" 2>/dev/null || true
+    done
+}
+HEARTBEAT_PID=""
+if [ "${LIVE_HEARTBEAT_SECS:-0}" -gt 0 ] 2>/dev/null; then
+    _heartbeat_loop &
+    HEARTBEAT_PID=$!
+    trap '[ -n "$HEARTBEAT_PID" ] && kill "$HEARTBEAT_PID" 2>/dev/null' EXIT
+fi
 
 # ── Main Loop ─────────────────────────────────────────────────────────────────
 echo "──────────────────────────────────────────────────"
