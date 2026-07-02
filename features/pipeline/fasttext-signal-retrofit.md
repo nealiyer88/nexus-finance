@@ -24,19 +24,21 @@ This feature retrofits the shipped matching stack to v4: adds pre-trained fastTe
 - **fastText vector loader** (`core/matching/embeddings.py`, NEW): load a compressed/quantized pre-trained English model (<100MB), expose `embed(normalized_name: str) -> tuple[float, ...] | None` and `cosine(a, b) -> float`. Pure-Python load path. No C++ compile. Model file lives under `models/`, gitignored, fetched by a script.
 - **Stage 2c — fastText candidate retrieval** (extend `core/matching/indices.py` + wire into `core/matching/blocking.py`): build an in-memory `EmbeddingIndex` (canonical_id → vector) at pipeline start from the same seed strings as TokenIndex/NgramIndex. On query, compute the incoming entity's embedding and return top-k nearest by **flat cosine scan** (no ANN library). Union these candidates with the existing token + trigram candidates, recording a `embed:<rank>` blocking signal per candidate. Intra-system filter (2d) and CANDIDATE_CAP (2e) apply unchanged.
 - **Stage 3 Signal Set C — fastText cosine** (extend `core/matching/scoring.py` + `core/matching/weights.py`): add `fasttext_cosine` as a weighted signal in the ensemble, with a per-category-pair weight in `WeightConfig`. Surface the raw cosine in `signal_breakdown`.
-- **Stage 3 Signal Set B reconciliation** (`core/matching/scoring.py`): read what shipped, then ensure all six signals exist, each gated to the 0.70–0.90 ambiguous zone, with the v4 boost ranges:
-  - B1 shared person entity (+0.05–0.10)
-  - B2 project-code fragment in QB ref/class/memo (+0.08–0.12)
-  - B3 amount co-occurrence within AMOUNT_TOLERANCE same period (+0.10–0.15)
-  - B4 shared email domain (+0.05–0.08)
-  - B5 temporal co-occurrence, same 30-day first-seen window (+0.03–0.05)
-  - B6 graph neighborhood overlap (+0.02–0.05 per shared node, capped +0.10)
-  - **Total Signal Set B boost hard-capped at +0.20.** Every applied boost logged in `signal_breakdown` with signal id, raw value, and applied value (auditability per v4 §9).
+- **Stage 3 Signal Set B reconciliation** (`core/matching/scoring.py`): implement five of six signals using existing V1 schema. Each signal gated to the 0.70–0.90 ambiguous zone, with v4 boost ranges enforced and the +0.20 hard cap applied AFTER summation:
+  - B1 shared person entity (+0.05–0.10) — reads `entity_edges` SAME_AS/MEMBER_OF
+  - B2 project-code fragment in QB ref/class/memo (+0.08–0.12) — reads `system_references.external_fields` JSON for `class`/`memo` fields, extracts segments via the existing project-code shape utility, matches against PSA-side project codes via `_check_psa_abbreviation`'s shortcode logic
+  - B4 shared email domain (+0.05–0.08) — reads `system_references.external_fields.email`, splits on `@`, compares domain (case-insensitive)
+  - B5 temporal co-occurrence, same 30-day first-seen window (+0.03–0.05) — reads `canonical_entities.created_at` on both canonicals, fires when `abs(delta_days) <= 30`
+  - B6 graph neighborhood overlap (+0.02–0.05 per shared node, capped +0.10) — already shipped, reconcile to spec-mandated cap
+
+  **Every applied boost logged in `signal_breakdown`** with signal id, raw value, applied value (per spec v4 §9 audit). Total Signal Set B boost hard-capped at +0.20.
+- **Defensive guard against deferred-signal accidental population:** B3 (amount co-occurrence) is OUT OF SCOPE for this feature — it requires a transactions table not in V1 schema. `_compute_b_boosts` MUST NOT include any field, parameter, or branch related to B3. Reviewers MUST grep the diff for `amount_cooccurrence`, `transaction`, and similar; their presence in any code or test is a BLOCKING violation. (This guard exists because the prior attempt at this feature shipped no-op B3 scaffolds that violated NON-GOALS — see CC-LEARNINGS 2026-06-21.)
 - **Model fetch script** (`scripts/fetch_fasttext.py`, NEW): downloads/places the compressed model into `models/`. Idempotent; skips if present. Documents the source and SHA.
 - **Tests:** extend `tests/test_blocking.py`, `tests/test_scoring.py`; add `tests/test_embeddings.py`. Use a tiny vendored/stub vector set or monkeypatched `embed` for unit tests so the suite does not depend on the full model download.
 
 ### Out of Scope
 
+- B3 amount co-occurrence — deferred to **feature 8b** (`features/pipeline/b3-transactions-table-and-amount-signal.md`, to be authored). 8b will add a minimal transactions table to `db/schema.sql` and `db/schema_sqlite.sql` plus the B3 signal implementation. 8b is the prerequisite for feature 12 (matcher-orchestrator) to measure against the 95% gate over real cycles.
 - Fine-tuned fastText (V2+; corpus-dependent — rules §11).
 - True ANN index (faiss/annoy/hnswlib). Flat cosine is correct at <500 entities; revisit at >50K.
 - Contextual / Layer-3 embeddings on transactional co-occurrence (V2+).
@@ -53,7 +55,7 @@ This feature retrofits the shipped matching stack to v4: adds pre-trained fastTe
 - [ ] Stage 2c: for query `"pacrim tech"` against a registry seeded with `"pacific rim technologies international"`, the fastText path surfaces that canonical as a candidate when token + trigram blocking alone do not. Asserted in `tests/test_blocking.py`.
 - [ ] Stage 3 Signal Set C: `score_pair` output `signal_breakdown` contains a `fasttext_cosine` entry for every scored pair; weight is category-pair-dispatched (PSA↔Accounting ≠ Accounting↔Accounting).
 - [ ] Abbreviation lift: `"meridian cap"` ↔ `"meridian capital group"` and `"pacrim tech"` ↔ `"pacific rim technologies international"` score **above SURFACE (0.70)** with Signal Set C enabled, and **below 0.70** with it disabled (proves the signal is doing the work). Asserted in `tests/test_scoring.py`.
-- [ ] Signal Set B: all of B1–B6 present and reachable; a synthetic pair that trips ≥4 B-signals receives total B boost **exactly capped at +0.20**, with each boost itemized in `signal_breakdown`.
+- [ ] Signal Set B: B1, B2, B4, B5, B6 present and reachable; B3 explicitly absent from `_compute_b_boosts`; a synthetic pair that trips ≥4 B-signals receives total B boost **exactly capped at +0.20**, with each boost itemized in `signal_breakdown`.
 - [ ] Known non-match `"brightpath machine learning"` (QB) vs `"luminos ai"` (RUDDR) still scores <0.50 — graph corroboration does not override strong negative string + embedding signal (the +0.20 cap holds).
 - [ ] `requirements.txt` adds exactly one new pinned dependency for vector loading; no compiled/transitive C++ build required on Apple Silicon CI.
 - [ ] `models/` raw model file is gitignored; `scripts/fetch_fasttext.py` is idempotent.
@@ -67,6 +69,7 @@ This feature retrofits the shipped matching stack to v4: adds pre-trained fastTe
 - [ ] Feature 8 (pairwise-scoring) SHIPPED — extends `scoring.py`, `weights.py`. **CC must read the shipped versions and reconcile, not greenfield.**
 - [ ] Rules file edits applied (§1, §6, §11, §13 — pre-trained fastText IN SCOPE).
 - [ ] Vector-loader library selection confirmed in Phase 1 adversary debate (see Implementation Notes).
+- Feature 8b (B3 + transactions table) will follow but does NOT gate this feature.
 
 ---
 

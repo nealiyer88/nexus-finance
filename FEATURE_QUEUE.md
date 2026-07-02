@@ -17,10 +17,11 @@
 | 7 | deterministic-blocking | features/pipeline/deterministic-blocking.md | 4, 5, 6 | v3 (retrofit by 8a) | SHIPPED |
 | 8 | pairwise-scoring | features/pipeline/pairwise-scoring.md | 7 | v3 (retrofit by 8a) | SHIPPED |
 | 8a | fasttext-signal-retrofit | features/pipeline/fasttext-signal-retrofit.md | 7, 8 | v4 §5,9,17 | QUEUED |
+| 8b | b3-transactions-table-and-amount-signal | features/pipeline/b3-transactions-table-and-amount-signal.md | 8a | v4 §9 B3 | QUEUED |
 | 9 | threshold-llm-fallback | features/pipeline/threshold-llm-fallback.md | 8 | v3 (unaffected by v4) | SHIPPED |
 | 10 | resolution-graph-update | features/pipeline/resolution-graph-update.md | 9 | v4 | QUEUED |
 | 11 | approval-queue | features/dashboard/approval-queue.md | 9, 10 | v4 | QUEUED |
-| 12 | matcher-orchestrator | features/pipeline/matcher-orchestrator.md | 7, 8, 8a, 9, 10 | v4 §7 | QUEUED |
+| 12 | matcher-orchestrator | features/pipeline/matcher-orchestrator.md | 7, 8, 8a, 8b, 9, 10 | v4 §7 | QUEUED |
 | 13 | historical-cold-start | features/data/historical-cold-start.md | 11, 12 | v4 | QUEUED |
 | 14 | overview-entity-browser | features/dashboard/overview-entity-browser.md | 10, 11 | v4 | QUEUED |
 | 15 | ar-reconciliation | features/dashboard/ar-reconciliation.md | 12, 14 | v4 | QUEUED |
