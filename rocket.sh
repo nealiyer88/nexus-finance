@@ -31,7 +31,9 @@ for _cfg in "./rocket.config.sh" "$SCRIPT_DIR/rocket.config.sh"; do
 done
 
 # ── Defaults (config wins; these fill any gaps) ───────────────────────────────
-: "${MODEL_PLAN:=opus}"
+# Plan tier (adversaries + reconcile) defaults to Fable 5; a preflight below falls
+# back to opus if Fable is unavailable in this environment (claude adapter only).
+: "${MODEL_PLAN:=claude-fable-5}"
 : "${MODEL_BUILD:=sonnet}"
 : "${MODEL_NARRATE:=claude-haiku-4-5-20251001}"
 : "${FEATURE_BUDGET_USD:=50}"
@@ -83,6 +85,16 @@ for _fn in agent_build_cmd agent_extract agent_narrate; do
         exit 1
     fi
 done
+
+# ── Fable preflight (claude adapter only) ─────────────────────────────────────
+# MODEL_PLAN defaults to claude-fable-5 above. Probe it once at startup; if this
+# account/CLI can't run Fable, fall back to opus so the loop never dies mid-debate.
+if [ "$AGENT" = "claude" ] && [ "$MODEL_PLAN" = "claude-fable-5" ]; then
+    if ! claude -p "ok" --model claude-fable-5 --output-format text >/dev/null 2>&1; then
+        echo "rocket: claude-fable-5 unavailable — MODEL_PLAN falling back to opus" >&2
+        MODEL_PLAN="opus"
+    fi
+fi
 
 AGENTS_DIR=".claude/agents"
 COMMANDS_DIR=".claude/commands"
