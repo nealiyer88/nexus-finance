@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime
 from typing import Optional
 
 
@@ -348,6 +349,89 @@ def _neighbors(
         (canonical_id, tenant_id, tenant_id, canonical_id, tenant_id, tenant_id),
     ).fetchall()
     return {nid for (nid,) in rows}
+
+
+def get_created_at(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> Optional[datetime]:
+    """Return the created_at timestamp for `canonical_id`, or None if absent."""
+    if tenant_id is None:
+        row = conn.execute(
+            "SELECT created_at FROM canonical_entities WHERE canonical_id = ?",
+            (canonical_id,),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            """
+            SELECT created_at FROM canonical_entities
+             WHERE canonical_id = ?
+               AND tenant_id = ?
+            """,
+            (canonical_id, tenant_id),
+        ).fetchone()
+    if row is None or row[0] is None:
+        return None
+    raw = row[0]
+    if isinstance(raw, datetime):
+        return raw
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
+        try:
+            return datetime.strptime(str(raw), fmt)
+        except ValueError:
+            pass
+    return None
+
+
+def get_external_field(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    field_name: str,
+    tenant_id: Optional[str] = None,
+) -> Optional[str]:
+    """Return the first non-None value for `field_name` from any
+    system_references.external_fields JSON row for `canonical_id`.
+
+    Uses a LIKE perf hint on the JSON text; authoritative match is done
+    in Python, matching the pattern of `lookup_email`.
+    """
+    needle = f'%"{field_name}"%'
+    if tenant_id is None:
+        rows = conn.execute(
+            """
+            SELECT s.external_fields
+              FROM system_references AS s
+             WHERE s.canonical_id = ?
+               AND s.external_fields LIKE ?
+            """,
+            (canonical_id, needle),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT s.external_fields
+              FROM system_references AS s
+              JOIN canonical_entities AS c ON c.canonical_id = s.canonical_id
+             WHERE s.canonical_id = ?
+               AND c.tenant_id = ?
+               AND s.external_fields LIKE ?
+            """,
+            (canonical_id, tenant_id, needle),
+        ).fetchall()
+    for (fields_json,) in rows:
+        if not fields_json:
+            continue
+        try:
+            payload = json.loads(fields_json)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        val = payload.get(field_name)
+        if val is not None:
+            return str(val)
+    return None
 
 
 def count_shared_person_neighbors(

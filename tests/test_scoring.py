@@ -19,9 +19,11 @@ import pytest
 from core.ingestion.normalizer import normalize_entity
 from core.matching.embeddings import _model_present
 from core.matching.scoring import (
+    MAX_B_BOOST,
     MAX_NEIGHBORHOOD_BONUS,
     MAX_SHARED_PERSON_BONUS,
     _check_psa_abbreviation,
+    _compute_b_boosts,
     ngram_jaccard,
     score_candidate_set,
     score_pair,
@@ -827,7 +829,125 @@ def test_10_synthesized_non_match_pairs_score_below_no_match(
 
 
 # ---------------------------------------------------------------------------
-# 12. Signal Set C integration test (model-gated)
+# 12. Signal Set B unit tests (B2, AC-24 cap, AC-25 negative)
+# ---------------------------------------------------------------------------
+
+
+def test_b2_fires_on_overlapping_project_code_fragments(conn: sqlite3.Connection) -> None:
+    """AC-17 positive: two overlapping code fragments → B2 fires, raw=0.12."""
+    result = _compute_b_boosts(
+        conn=conn,
+        source_id=None,
+        candidate_id="CAN-X",
+        source_category="accounting",
+        candidate_category="psa",
+        source_external_fields={"class": "GENAI-SOW3", "memo": "GENAI Q4"},
+        candidate_external_fields={"project_codes": ["CEN-GENAI-SOW3", "CEN-GENAI"]},
+        base_score=0.80,
+    )
+    b2 = next((e for e in result if e.signal_id == "B2"), None)
+    assert b2 is not None, "B2 must fire when ≥2 project-code fragments overlap"
+    assert b2.raw == 0.12
+
+
+def test_b2_does_not_fire_on_disjoint_fragments(conn: sqlite3.Connection) -> None:
+    """AC-17 negative: disjoint fragments → B2 does not fire."""
+    result = _compute_b_boosts(
+        conn=conn,
+        source_id=None,
+        candidate_id="CAN-X",
+        source_category="accounting",
+        candidate_category="psa",
+        source_external_fields={"class": "ALPHA-PROJ"},
+        candidate_external_fields={"project_codes": ["BETA-TASK"]},
+        base_score=0.80,
+    )
+    assert all(e.signal_id != "B2" for e in result), "B2 must not fire when no fragments overlap"
+
+
+def test_b_boosts_total_applied_capped_at_max(conn: sqlite3.Connection) -> None:
+    """AC-24: when sum(raw) > MAX_B_BOOST, applied values are scaled
+    proportionally so sum(applied) == MAX_B_BOOST exactly.
+
+    Signals: B1 raw=0.10 (2 shared persons) + B2 raw=0.12 (2 code
+    fragments) = 0.22 total raw; cap distributes 0.20 proportionally.
+    B4, B5, B6 are mocked out so only B1 and B2 fire.
+    """
+    import unittest.mock as _mock
+
+    with _mock.patch(
+        "core.matching.scoring.count_shared_person_neighbors", return_value=2
+    ), _mock.patch(
+        "core.matching.scoring.get_external_field", return_value=None
+    ), _mock.patch(
+        "core.matching.scoring.get_created_at", return_value=None
+    ), _mock.patch(
+        "core.matching.scoring.count_shared_graph_neighbors", return_value=0
+    ):
+        result = _compute_b_boosts(
+            conn=conn,
+            source_id="CAN-SRC",
+            candidate_id="CAN-CAND",
+            source_category="accounting",
+            candidate_category="psa",
+            source_external_fields={"class": "GENAI-SOW3", "memo": "GENAI Q4"},
+            candidate_external_fields={"project_codes": ["CEN-GENAI-SOW3", "CEN-GENAI"]},
+            base_score=0.80,
+        )
+
+    assert len(result) == 2, f"expected B1+B2 only, got {result}"
+    b1 = next(e for e in result if e.signal_id == "B1")
+    b2 = next(e for e in result if e.signal_id == "B2")
+    assert b1.raw == 0.10
+    assert b2.raw == 0.12
+    total_applied = sum(e.applied for e in result)
+    assert math.isclose(total_applied, MAX_B_BOOST, abs_tol=1e-9), (
+        f"expected sum(applied)=={MAX_B_BOOST}, got {total_applied}"
+    )
+    for e in result:
+        assert e.applied <= e.raw + 1e-9, f"{e.signal_id}: applied {e.applied} > raw {e.raw}"
+
+
+def test_b_boosts_do_not_fire_outside_ambiguous_band(conn: sqlite3.Connection) -> None:
+    """B-boosts return () when base_score < 0.70 or base_score >= 0.90."""
+    import unittest.mock as _mock
+
+    for base in (0.50, 0.69, 0.90, 1.0):
+        with _mock.patch(
+            "core.matching.scoring.count_shared_person_neighbors", return_value=5
+        ):
+            result = _compute_b_boosts(
+                conn=conn,
+                source_id="CAN-SRC",
+                candidate_id="CAN-CAND",
+                source_category="accounting",
+                candidate_category="psa",
+                source_external_fields={},
+                candidate_external_fields={},
+                base_score=base,
+            )
+        assert result == (), f"expected () at base_score={base}, got {result}"
+
+
+def test_ac25_brightpath_vs_luminos_scores_below_no_match(conn: sqlite3.Connection) -> None:
+    """AC-25: 'brightpath machine learning' vs 'luminos ai' — distinct
+    entities with no shared tokens score < 0.50 (NO_MATCH band)."""
+    entity = _make_entity("brightpath machine learning", source="quickbooks")
+    result = score_pair(
+        entity=entity,
+        candidate_id="CAN-LUM",
+        candidate_name="luminos ai",
+        candidate_aliases=(),
+        candidate_category="psa",
+        conn=conn,
+    )
+    assert result.score < 0.50, (
+        f"score={result.score}; breakdown={result.signal_breakdown}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 13. Signal Set C integration test (model-gated)
 # ---------------------------------------------------------------------------
 
 
