@@ -47,6 +47,7 @@ class SignalBreakdown:
     0..1. Boolean fields record whether the additive bonuses fired.
     All five weighted signals are always present (even when zero) so
     debug output can compare a scorer pass to its weight profile.
+    `fasttext_cosine` is 0.0 when the model file is absent.
     """
 
     token_sort_ratio: float
@@ -56,6 +57,7 @@ class SignalBreakdown:
     ngram_jaccard: float
     alias_boost_fired: bool
     abbreviation_bonus_fired: bool
+    fasttext_cosine: float = 0.0
 
 
 @dataclass(frozen=True)

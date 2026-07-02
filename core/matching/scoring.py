@@ -60,6 +60,7 @@ from core.graph.entity_store import (
     get_aliases,
     get_canonical_name_and_category,
 )
+from core.matching import embeddings as _embeddings
 from core.matching.types import (
     CandidateSet,
     GraphEvidence,
@@ -226,8 +227,8 @@ def _compute_signal_breakdown(
     entity_category: str,
     candidate_category: str,
 ) -> SignalBreakdown:
-    """Compute all five weighted string-metric signals plus both
-    boolean bonus flags. Pure function — no DB access."""
+    """Compute all string-metric signals, fasttext cosine, and bonus flags.
+    Pure function — no DB access."""
     token_sort = float(fuzz.token_sort_ratio(entity_name, candidate_name))
     token_set = float(fuzz.token_set_ratio(entity_name, candidate_name))
     partial = float(fuzz.partial_ratio(entity_name, candidate_name))
@@ -243,6 +244,10 @@ def _compute_signal_breakdown(
         entity_category=entity_category,
         candidate_category=candidate_category,
     )
+    ft_cosine = _embeddings.cosine(
+        _embeddings.embed(entity_name),
+        _embeddings.embed(candidate_name),
+    )
     return SignalBreakdown(
         token_sort_ratio=token_sort,
         token_set_ratio=token_set,
@@ -251,6 +256,7 @@ def _compute_signal_breakdown(
         ngram_jaccard=jaccard,
         alias_boost_fired=alias_fired,
         abbreviation_bonus_fired=abbrev_fired,
+        fasttext_cosine=ft_cosine,
     )
 
 
@@ -286,13 +292,14 @@ def _compute_graph_evidence(
 def _weighted_score(
     weights: WeightConfig, breakdown: SignalBreakdown, evidence: GraphEvidence
 ) -> float:
-    """Combine weighted signals + bonuses + evidence; clamp to [0, 1]."""
+    """Combine weighted signals + fasttext cosine + bonuses + evidence; clamp to [0, 1]."""
     weighted_sum = (
         weights.token_sort_ratio * breakdown.token_sort_ratio / 100.0
         + weights.token_set_ratio * breakdown.token_set_ratio / 100.0
         + weights.partial_ratio * breakdown.partial_ratio / 100.0
         + weights.jaro_winkler * breakdown.jaro_winkler / 100.0
         + weights.ngram_jaccard * breakdown.ngram_jaccard
+        + weights.fasttext_cosine * breakdown.fasttext_cosine
     )
     raw = (
         weighted_sum

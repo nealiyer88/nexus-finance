@@ -119,6 +119,53 @@ class NgramIndex:
         return tuple(padded[i : i + n] for i in range(len(padded) - n + 1))
 
 
+class EmbeddingIndex:
+    """Flat cosine-similarity ANN over pre-trained fastText word vectors.
+
+    Built once per pipeline run from the same seed strings as TokenIndex and
+    NgramIndex. When the model file is absent (CI / fresh checkout) every call
+    to `build` produces an empty index and `query` always returns []. The
+    Stage 2c caller passes `embedding_index=None` in that case.
+    """
+
+    def __init__(self) -> None:
+        self._vectors: dict[str, tuple[float, ...]] = {}
+
+    @classmethod
+    def build(
+        cls,
+        conn: sqlite3.Connection,
+        tenant_id: Optional[str] = None,
+    ) -> "EmbeddingIndex":
+        from core.matching import embeddings as _emb
+
+        idx = cls()
+        accum: dict[str, list[tuple[float, ...]]] = {}
+        for canonical_id, value in _iter_seed_strings(conn, tenant_id):
+            vec = _emb.embed(value)
+            if vec is not None:
+                accum.setdefault(canonical_id, []).append(vec)
+        for cid, vecs in accum.items():
+            dim = len(vecs[0])
+            avg = tuple(sum(v[i] for v in vecs) / len(vecs) for i in range(dim))
+            idx._vectors[cid] = avg
+        return idx
+
+    def query(self, name: str, top_k: int) -> list[tuple[str, float]]:
+        """Return up to `top_k` (canonical_id, cosine_score) pairs, descending."""
+        from core.matching import embeddings as _emb
+
+        vec = _emb.embed(name)
+        if vec is None:
+            return []
+        scores = [
+            (cid, _emb.cosine(vec, stored))
+            for cid, stored in self._vectors.items()
+        ]
+        scores.sort(key=lambda x: -x[1])
+        return scores[:top_k]
+
+
 def _iter_seed_strings(
     conn: sqlite3.Connection,
     tenant_id: Optional[str],

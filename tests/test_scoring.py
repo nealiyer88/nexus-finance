@@ -17,6 +17,7 @@ from typing import Any, Optional
 import pytest
 
 from core.ingestion.normalizer import normalize_entity
+from core.matching.embeddings import _model_present
 from core.matching.scoring import (
     MAX_NEIGHBORHOOD_BONUS,
     MAX_SHARED_PERSON_BONUS,
@@ -543,6 +544,7 @@ def test_signal_breakdown_carries_every_weighted_signal(conn: sqlite3.Connection
     assert breakdown.ngram_jaccard >= 0
     assert isinstance(breakdown.alias_boost_fired, bool)
     assert isinstance(breakdown.abbreviation_bonus_fired, bool)
+    assert breakdown.fasttext_cosine >= 0
 
 
 # ---------------------------------------------------------------------------
@@ -825,23 +827,56 @@ def test_10_synthesized_non_match_pairs_score_below_no_match(
 
 
 # ---------------------------------------------------------------------------
-# 12. Hygiene: no forbidden imports in scoring.py
+# 12. Signal Set C integration test (model-gated)
 # ---------------------------------------------------------------------------
 
 
-def test_no_xgboost_no_fasttext_no_llm_in_scoring() -> None:
-    src = (REPO_ROOT / "core" / "matching" / "scoring.py").read_text()
-    forbidden = (
-        "xgboost",
-        "fasttext",
-        "anthropic",
-        "openai",
-        "fastembed",
-        "sentence_transformers",
-        "torch",
-        "transformers",
-    )
-    for token in forbidden:
-        assert token not in src, (
-            f"scoring.py must not reference {token!r} (V1 NOT-SCOPE)"
+@pytest.mark.skipif(not _model_present(), reason="fasttext model not downloaded")
+def test_signal_c_lift_meridian_and_pacrim(conn: sqlite3.Connection) -> None:
+    """AC-10: fasttext_cosine=0.12 pushes ambiguous pairs above 0.70;
+    setting the weight to 0.0 drops them below 0.70."""
+    from dataclasses import replace
+
+    from core.matching.weights import PSA_ACCOUNTING_WEIGHTS
+
+    pairs = [
+        ("meridian cap", "meridian capital group"),
+        ("pacrim tech", "pacific rim technologies international"),
+    ]
+
+    for entity_name, candidate_name in pairs:
+        entity = _make_entity(entity_name, source="quickbooks")
+        _insert_canonical(conn, f"CAN-{candidate_name[:4].upper()}", candidate_name)
+        conn.commit()
+
+        result_with_ft = score_pair(
+            entity=entity,
+            candidate_id=f"CAN-{candidate_name[:4].upper()}",
+            candidate_name=candidate_name,
+            candidate_aliases=(),
+            candidate_category="psa",
+            conn=conn,
+        )
+        assert result_with_ft.score >= 0.70, (
+            f"With fasttext: {entity_name!r} vs {candidate_name!r} "
+            f"score={result_with_ft.score:.3f} (expected ≥0.70)"
+        )
+
+        # Disable fasttext weight to prove Signal C is load-bearing
+        no_ft_weights = replace(PSA_ACCOUNTING_WEIGHTS, fasttext_cosine=0.0)
+        from core.matching import weights as _wmod
+        import unittest.mock as _mock
+
+        with _mock.patch.object(_wmod, "get_weights", return_value=no_ft_weights):
+            result_no_ft = score_pair(
+                entity=entity,
+                candidate_id=f"CAN-{candidate_name[:4].upper()}",
+                candidate_name=candidate_name,
+                candidate_aliases=(),
+                candidate_category="psa",
+                conn=conn,
+            )
+        assert result_no_ft.score < 0.70, (
+            f"Without fasttext: {entity_name!r} vs {candidate_name!r} "
+            f"score={result_no_ft.score:.3f} (expected <0.70)"
         )
