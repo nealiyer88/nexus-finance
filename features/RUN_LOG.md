@@ -208,3 +208,11 @@
 
 **Pipeline health:** Multi-session resume executed cleanly. The RESUME_HERE.md pattern from the 06-14 pause held up — Phase 1–3 artifacts on disk + the build commit + clear resume steps made Phase 4 a clean spawn of fresh reviewer contexts with no need to re-do upstream work. The adversary debate's design-time cuts (per-call-tier, redaction-time embedding hash) meant Phase 3 shipped a tighter contract than the brief proposed; reviewers found no real bugs. Queue: features 1–9 SHIPPED, 8a + 10–17 QUEUED. v4 retrofit (8a) is next; 10+ unblock once 8a is in.
 | 2026-07-02T02:24:37 | 8a | GUARD | rocket | reverted out-of-lane mutation by code-review |
+| 2026-07-05T22:24:26 | 8b | cost:adv-design | claude | $0.22726400000000002 |
+| 2026-07-05T22:24:26 | 8b | adversary-design | opus | done |
+| 2026-07-05T22:25:01 | 8b | cost:adv-skeptic | claude | $0.1342345 |
+| 2026-07-05T22:25:01 | 8b | adversary-skeptic | opus | done |
+| 2026-07-05T22:26:17 | 8b | cost:adv-engineer | claude | $0.3674385 |
+| 2026-07-05T22:26:17 | 8b | adversary-engineer | opus | done |
+| 2026-07-05T22:27:03 | 8b | cost:reconcile | claude | $0.20077025 |
+| 2026-07-05T22:27:03 | 8b | reconcile | opus | done |
