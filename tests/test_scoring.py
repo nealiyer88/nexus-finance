@@ -144,7 +144,7 @@ def _make_entity(
 
 def test_no_xgboost_no_llm_no_deep_learning_in_scoring() -> None:
     """Guard: NOT-SCOPE ML libs must not appear in scoring.py (§11 rules)."""
-    scoring_src = pathlib.Path("core/matching/scoring.py").read_text()
+    scoring_src = (REPO_ROOT / "core" / "matching" / "scoring.py").read_text()
     for forbidden in ("xgboost", "anthropic", "openai", "fastembed",
                       "sentence_transformers", "torch", "transformers"):
         assert forbidden not in scoring_src, (
@@ -888,7 +888,8 @@ def test_b_boosts_total_applied_capped_at_max(conn: sqlite3.Connection) -> None:
     proportionally so sum(applied) == MAX_B_BOOST exactly.
 
     Signals: B1 raw=0.10 (2 shared persons) + B2 raw=0.12 (2 code
-    fragments) + B4 raw=0.08 (matching corporate email) + B5 raw=0.05
+    fragments) + B4 raw=0.08 (matching corporate email: source via
+    raw_record, candidate via merged external_fields) + B5 raw=0.05
     (5-day creation delta) = 0.35 total raw; cap distributes 0.20.
     B6 is mocked to 0 so only B1+B2+B4+B5 fire.
     """
@@ -901,8 +902,6 @@ def test_b_boosts_total_applied_capped_at_max(conn: sqlite3.Connection) -> None:
     with _mock.patch(
         "core.matching.scoring.count_shared_person_neighbors", return_value=2
     ), _mock.patch(
-        "core.matching.scoring.get_external_field", return_value="alice@acmecorp.com"
-    ), _mock.patch(
         "core.matching.scoring.get_created_at", side_effect=[ts_base, ts_offset]
     ), _mock.patch(
         "core.matching.scoring.count_shared_graph_neighbors", return_value=0
@@ -913,8 +912,15 @@ def test_b_boosts_total_applied_capped_at_max(conn: sqlite3.Connection) -> None:
             candidate_id="CAN-CAND",
             source_category="accounting",
             candidate_category="psa",
-            source_external_fields={"class": "GENAI-SOW3", "memo": "GENAI Q4"},
-            candidate_external_fields={"project_codes": ["CEN-GENAI-SOW3", "CEN-GENAI"]},
+            source_external_fields={
+                "class": "GENAI-SOW3",
+                "memo": "GENAI Q4",
+                "email": "alice@acmecorp.com",
+            },
+            candidate_external_fields={
+                "project_codes": ["CEN-GENAI-SOW3", "CEN-GENAI"],
+                "email": "bob@acmecorp.com",
+            },
             base_score=0.80,
         )
 
@@ -1010,8 +1016,12 @@ def _sc5_score_and_dispose(
     conn: sqlite3.Connection, entity_name: str, candidate_name: str
 ) -> tuple[ScoredMatch, str]:
     cid = f"CAN-{candidate_name[:4].upper()}"
-    _insert_canonical(conn, cid, candidate_name)
-    conn.commit()
+    exists = conn.execute(
+        "SELECT 1 FROM canonical_entities WHERE canonical_id = ?", (cid,)
+    ).fetchone()
+    if not exists:
+        _insert_canonical(conn, cid, candidate_name)
+        conn.commit()
     result = score_pair(
         entity=_make_entity(entity_name, source="quickbooks"),
         candidate_id=cid,
@@ -1051,6 +1061,20 @@ def test_sc5_pairs_route_to_review_queue_with_embeddings(
     assert pacrim_action == "QUEUE_FOR_REVIEW", (
         "abbreviation rescue must route the mid-band pacrim pair to review"
     )
+
+    # Load-bearing check: the fasttext weight must actually participate.
+    # With these sub-0.70 cosines, renormalization pulls the composite
+    # strictly BELOW the no-model score — equal scores would mean the
+    # signal was silently ignored.
+    with _sc5_mock.patch("core.matching.embeddings.embed", return_value=None):
+        meridian_nomodel, _ = _sc5_score_and_dispose(
+            conn, "meridian cap", "meridian capital group"
+        )
+        pacrim_nomodel, _ = _sc5_score_and_dispose(
+            conn, "pacrim tech", "pacific rim technologies international"
+        )
+    assert meridian.score < meridian_nomodel.score
+    assert pacrim.score < pacrim_nomodel.score
 
 
 def test_sc5_pairs_route_to_review_queue_without_model(

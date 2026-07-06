@@ -47,9 +47,19 @@ def _sha256(path: pathlib.Path) -> str:
 
 def main() -> None:
     if MODEL_PATH.exists():
+        sha = _sha256(MODEL_PATH)
+        if sha != EXPECTED_SHA256:
+            print(
+                f"[fetch_fasttext] existing model at {MODEL_PATH} has "
+                f"SHA256 {sha}, expected {EXPECTED_SHA256} — stale or "
+                "corrupt artifact (e.g. from the retired mirror). "
+                "Delete the file and re-run.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         print(
             f"[fetch_fasttext] model already present at {MODEL_PATH} "
-            "— skipping download"
+            "(SHA256 verified) — skipping download"
         )
         return
 

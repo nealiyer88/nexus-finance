@@ -376,6 +376,15 @@ def get_created_at(
     raw = row[0]
     if isinstance(raw, datetime):
         return raw
+    # fromisoformat covers every SQLite/ISO shape in one call, but on
+    # Python <3.11 it rejects the 'Z' UTC suffix (the format used in the
+    # canonical schema examples) — normalize to an offset first, then
+    # strip tzinfo so callers compare naive against naive.
+    try:
+        parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=None)
+    except ValueError:
+        pass
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
         try:
             return datetime.strptime(str(raw), fmt)

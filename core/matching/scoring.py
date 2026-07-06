@@ -46,7 +46,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal, Optional
 
 from rapidfuzz import fuzz
@@ -123,12 +123,27 @@ _FRAGMENT_SPLIT_RE = re.compile(r"[-/_\s]+")
 
 MAX_B_BOOST: float = 0.20
 
+# Signal Set B only fires in the ambiguous band (v4 §9). Shared by the
+# _compute_b_boosts guard and score_pair's decision to fetch candidate
+# external_fields at all.
+B_BOOST_BAND_LOW: float = 0.70
+B_BOOST_BAND_HIGH: float = 0.90
+
+# Key-casing variants per source system (QB emits PascalCase 'Class';
+# mirrors llm_fallback's _CLASS_CODE_KEYS / _PROJECT_CODE_KEYS).
+_B2_STRING_KEYS: tuple[str, ...] = (
+    "class", "Class", "class_code", "ClassCode", "memo", "Memo",
+)
+_B2_LIST_KEYS: tuple[str, ...] = ("project_codes", "projectCodes")
+_B4_EMAIL_KEYS: tuple[str, ...] = ("email", "Email", "PrimaryEmail", "primary_email")
+
 
 def _extract_project_code_fragments(external_fields: dict) -> set[str]:
-    """Return uppercase fragments (≥2 chars) from 'class', 'memo', and
-    'project_codes' in `external_fields`. Splits on -, /, _, and space."""
+    """Return uppercase fragments (≥2 chars) from class/memo/project-code
+    fields in `external_fields` (all key-casing variants). Splits on
+    -, /, _, and space."""
     out: set[str] = set()
-    for key in ("class", "memo"):
+    for key in _B2_STRING_KEYS:
         val = external_fields.get(key)
         if not isinstance(val, str):
             continue
@@ -136,8 +151,10 @@ def _extract_project_code_fragments(external_fields: dict) -> set[str]:
             frag = frag.upper()
             if len(frag) >= 2:
                 out.add(frag)
-    codes = external_fields.get("project_codes")
-    if isinstance(codes, list):
+    for key in _B2_LIST_KEYS:
+        codes = external_fields.get(key)
+        if not isinstance(codes, list):
+            continue
         for item in codes:
             if not isinstance(item, str):
                 continue
@@ -146,6 +163,15 @@ def _extract_project_code_fragments(external_fields: dict) -> set[str]:
                 if len(frag) >= 2:
                     out.add(frag)
     return out
+
+
+def _first_email(external_fields: dict) -> Optional[str]:
+    """First non-empty email value under any known key casing."""
+    for key in _B4_EMAIL_KEYS:
+        val = external_fields.get(key)
+        if isinstance(val, str) and val.strip():
+            return val
+    return None
 
 
 def _get_candidate_external_fields(
@@ -207,7 +233,7 @@ def _compute_b_boosts(
     caller already queried (score_pair queries them once for
     GraphEvidence per AC-23); None falls back to querying here.
     """
-    if base_score < 0.70 or base_score >= 0.90:
+    if base_score < B_BOOST_BAND_LOW or base_score >= B_BOOST_BAND_HIGH:
         return ()
 
     raws: list[tuple[Literal["B1", "B2", "B4", "B5", "B6"], float]] = []
@@ -230,9 +256,17 @@ def _compute_b_boosts(
         b2_raw = 0.12 if len(overlap) >= 2 else 0.08
         raws.append(("B2", b2_raw))
 
-    # B4 — matching email domain (+0.05 freemail, +0.08 corporate)
-    src_email = get_external_field(conn, source_id, "email", tenant_id) if source_id else None
-    cand_email = get_external_field(conn, candidate_id, "email", tenant_id)
+    # B4 — matching email domain (+0.05 freemail, +0.08 corporate).
+    # Source side: read the unresolved entity's own record first (the
+    # normal Stage 3 path has source_id=None, so a DB-only read would
+    # leave B4 permanently dark); resolved-entity DB read is the
+    # fallback. Candidate side: the merged external_fields dict is
+    # already in hand — a get_external_field query would rescan the
+    # same system_references rows.
+    src_email = _first_email(source_external_fields)
+    if src_email is None and source_id:
+        src_email = get_external_field(conn, source_id, "email", tenant_id)
+    cand_email = _first_email(candidate_external_fields)
     if src_email and cand_email:
         src_domain = src_email.split("@")[-1].lower() if "@" in src_email else ""
         cand_domain = cand_email.split("@")[-1].lower() if "@" in cand_email else ""
@@ -244,7 +278,10 @@ def _compute_b_boosts(
     ts_src = get_created_at(conn, source_id, tenant_id) if source_id else None
     ts_cand = get_created_at(conn, candidate_id, tenant_id)
     if ts_src is not None and ts_cand is not None:
-        delta_days = abs((ts_src - ts_cand).days)
+        # abs() BEFORE .days: timedelta.days floors toward -inf, so
+        # (a - b).days and (b - a).days differ by one for sub-day
+        # remainders — the boost must be symmetric in argument order.
+        delta_days = abs(ts_src - ts_cand).days
         if delta_days <= 30:
             b5_raw = 0.05 if delta_days < 15 else 0.03
             raws.append(("B5", b5_raw))
@@ -308,21 +345,36 @@ def _is_concat_of_token_prefixes(token: str, long_tokens: list[str]) -> bool:
     """True when `token` is a concatenation of prefixes (each
     ≥ ABBREV_MIN_CONCAT_PART_LEN chars) of 2+ CONSECUTIVE tokens of
     `long_tokens` — the 'pacrim' = 'pac|rim' over 'pacific rim' pattern.
-    The whole token must be consumed."""
+    The whole token must be consumed.
 
-    def consume(rest: str, idx: int, depth: int) -> bool:
-        if not rest:
-            return depth >= 2
+    Memoized on (position, token index, min(parts, 2)) — states are
+    polynomial, so adversarially repetitive source-system names
+    ('aa aa aa …') cannot trigger exponential path exploration."""
+
+    def consume(pos: int, idx: int, parts: int, memo: dict) -> bool:
+        if pos == len(token):
+            return parts >= 2
         if idx >= len(long_tokens):
             return False
+        key = (pos, idx, min(parts, 2))
+        cached = memo.get(key)
+        if cached is not None:
+            return cached
         tok = long_tokens[idx]
-        hi = min(len(rest), len(tok))
+        hi = min(len(token) - pos, len(tok))
+        result = False
         for take in range(ABBREV_MIN_CONCAT_PART_LEN, hi + 1):
-            if tok[:take] == rest[:take] and consume(rest[take:], idx + 1, depth + 1):
-                return True
-        return False
+            if tok[:take] == token[pos : pos + take] and consume(
+                pos + take, idx + 1, parts + 1, memo
+            ):
+                result = True
+                break
+        memo[key] = result
+        return result
 
-    return any(consume(token, start, 0) for start in range(len(long_tokens) - 1))
+    return any(
+        consume(0, start, 0, {}) for start in range(len(long_tokens) - 1)
+    )
 
 
 def _tokens_abbreviate(short_name: str, long_name: str) -> bool:
@@ -568,14 +620,13 @@ def _base_weighted_score(
 
 
 def _weighted_score(
-    weights: WeightConfig,
-    breakdown: SignalBreakdown,
+    base_score: float,
     b_boosts: tuple[BoostEntry, ...],
 ) -> float:
-    """Combine base score + Signal Set B applied boosts; clamp to [0, 1]."""
-    raw = _base_weighted_score(weights, breakdown) + sum(
-        e.applied for e in b_boosts
-    )
+    """Combine the precomputed base score + Signal Set B applied boosts;
+    clamp to [0, 1]. Takes the base rather than recomputing it so the
+    band-gating value and the scored value can never diverge."""
+    raw = base_score + sum(e.applied for e in b_boosts)
     return min(1.0, max(0.0, raw))
 
 
@@ -632,7 +683,14 @@ def score_pair(
         conn, source_canonical_id, candidate_id, tenant_id
     )
 
-    candidate_ext = _get_candidate_external_fields(conn, candidate_id, tenant_id)
+    # external_fields only feed B2, which only fires in the ambiguous
+    # band — skip the per-pair fetch + JSON parse everywhere else.
+    in_b_band = B_BOOST_BAND_LOW <= base_score < B_BOOST_BAND_HIGH
+    candidate_ext = (
+        _get_candidate_external_fields(conn, candidate_id, tenant_id)
+        if in_b_band
+        else {}
+    )
     b_boosts = _compute_b_boosts(
         conn=conn,
         source_id=source_canonical_id,
@@ -647,22 +705,11 @@ def score_pair(
         neighbor_count=neighbor_count,
     )
 
-    score = _weighted_score(weights, breakdown, b_boosts)
+    score = _weighted_score(base_score, b_boosts)
 
     evidence = _compute_graph_evidence(person_count, neighbor_count)
 
-    final_breakdown = SignalBreakdown(
-        token_sort_ratio=breakdown.token_sort_ratio,
-        token_set_ratio=breakdown.token_set_ratio,
-        partial_ratio=breakdown.partial_ratio,
-        jaro_winkler=breakdown.jaro_winkler,
-        ngram_jaccard=breakdown.ngram_jaccard,
-        alias_boost_fired=breakdown.alias_boost_fired,
-        abbreviation_bonus_fired=breakdown.abbreviation_bonus_fired,
-        fasttext_cosine=breakdown.fasttext_cosine,
-        fasttext_available=breakdown.fasttext_available,
-        b_boosts=b_boosts,
-    )
+    final_breakdown = replace(breakdown, b_boosts=b_boosts)
 
     return ScoredMatch(
         canonical_id=candidate_id,

@@ -128,6 +128,7 @@ def apply_thresholds(
             cluster_conflict = True
 
     final_action: Action = base_action
+    abbreviation_rescue = False
     if cluster_conflict and base_action == "AUTO_APPROVE":
         final_action = "QUEUE_FOR_REVIEW"
     elif (
@@ -137,6 +138,7 @@ def apply_thresholds(
         # Abbreviation rescue (module docstring): heuristic-fired
         # mid-band pairs route to human review, not the LLM.
         final_action = "QUEUE_FOR_REVIEW"
+        abbreviation_rescue = True
 
     return Disposition(
         source_entity_id=source_entity_id,
@@ -146,4 +148,5 @@ def apply_thresholds(
         cluster_conflict=cluster_conflict,
         llm_assessment=None,
         tenant_id=tenant_id,
+        abbreviation_rescue=abbreviation_rescue,
     )

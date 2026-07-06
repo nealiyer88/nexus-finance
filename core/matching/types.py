@@ -73,7 +73,12 @@ class SignalBreakdown:
 
 @dataclass(frozen=True)
 class GraphEvidence:
-    """Stage 3's graph-corroborated additive bonuses.
+    """Shared-neighbor evidence observed for the pair — a REPORT, not a
+    score contribution. Since the 8a Signal Set B retrofit, the applied
+    graph boosts live in `SignalBreakdown.b_boosts` (band-gated,
+    +0.20-capped); the `*_bonus` fields here are the legacy-formula
+    values derived from the same counts and may legitimately be nonzero
+    on pairs whose score received no boost (base outside the B band).
 
     On a fresh DB with no `entity_edges` rows (V1 default; Stage 6
     owns writes), all four fields are 0 / 0.0. Tests seed edges
@@ -148,13 +153,19 @@ class LLMAssessment:
 class Disposition:
     """Stage 4 result. In-memory only — Stage 4 does not write to SQLite.
 
-    - `action` is the band derived from `top_match.score`, with override
-      to QUEUE_FOR_REVIEW when `cluster_conflict` is True.
+    - `action` is the band derived from `top_match.score`, with two
+      overrides: downgrade to QUEUE_FOR_REVIEW when `cluster_conflict`
+      is True, and upgrade to QUEUE_FOR_REVIEW when
+      `abbreviation_rescue` is True (SC-5 amended 2026-07-05).
     - `top_match` is None iff `action == NO_MATCH` (no candidate ≥ 0.50).
     - `candidates_ranked` is the deduped-by-canonical_id input tuple,
       sorted descending by (score, ascending canonical_id).
     - `cluster_conflict` is True iff the top-2 distinct canonicals both
       score ≥ SURFACE_THRESHOLD AND are not linked by a SAME_AS edge.
+    - `abbreviation_rescue` is True iff the action was upgraded from
+      LLM_FALLBACK because the top match's PSA↔Accounting abbreviation
+      heuristic fired — recorded so the review queue (feature 11) can
+      show WHY a sub-SURFACE item is queued without re-deriving bands.
     - `llm_assessment` is populated only after Stage 5 runs.
     - `tenant_id` is propagated from the orchestrator for downstream
       tenant-scoped writes (e.g., the llm_training_data row).
@@ -167,3 +178,4 @@ class Disposition:
     cluster_conflict: bool
     llm_assessment: Optional[LLMAssessment]
     tenant_id: Optional[str]
+    abbreviation_rescue: bool = False

@@ -195,6 +195,7 @@ def test_abbreviation_rescue_upgrades_llm_fallback_to_review(
         conn,
     )
     assert disp.action == "QUEUE_FOR_REVIEW"
+    assert disp.abbreviation_rescue is True
 
 
 def test_no_rescue_without_abbreviation_flag(conn: sqlite3.Connection) -> None:
@@ -202,6 +203,7 @@ def test_no_rescue_without_abbreviation_flag(conn: sqlite3.Connection) -> None:
         "src-1", (_make_scored_match("CAN-A", 0.60),), conn
     )
     assert disp.action == "LLM_FALLBACK"
+    assert disp.abbreviation_rescue is False
 
 
 def test_rescue_does_not_lift_no_match(conn: sqlite3.Connection) -> None:

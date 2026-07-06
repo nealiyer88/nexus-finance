@@ -11,9 +11,12 @@ O(n*k) by surfacing a bounded candidate set per query entity. Three steps:
         that candidate is the query's own canonical via deterministic match
         and Stage 1 owns it. Candidates with refs across multiple sources
         survive as long as no exact (source, source_id) collision.
-    2e. Cap at CANDIDATE_CAP (50). On overflow, hard-truncate in
-        canonical_id sort order and emit a `logger.warning`. No ranking,
-        no IDF.
+    2e. Cap at CANDIDATE_CAP (50). On overflow, hard-truncate keeping
+        token/trigram-corroborated candidates before embed-only ones
+        (the embedding channel returns top_k hits regardless of cosine,
+        so embed-only noise must never evict a lexical match), in
+        canonical_id sort order within each group, and emit a
+        `logger.warning`. No ranking, no IDF beyond that.
 
 Empty input (no tokens, no trigrams) returns an empty CandidateSet rather
 than raising — guards against future normalizer regressions producing
@@ -65,10 +68,14 @@ def generate_candidates(
         for cid in cids:
             signals_by_candidate.setdefault(cid, set()).add(f"trigram:{gram}")
 
-    # Stage 2c: fastText flat-cosine ANN (skipped when embedding_index is None)
+    # Stage 2c: fastText flat-cosine ANN (skipped when embedding_index is
+    # None). Non-positive cosines are noise — query() returns top_k hits
+    # unconditionally, so an explicit floor keeps orthogonal names out.
     if embedding_index is not None:
         embed_hits = embedding_index.query(entity.normalized_name, top_k=CANDIDATE_CAP)
-        for rank, (cid, _score) in enumerate(embed_hits, start=1):
+        for rank, (cid, score) in enumerate(embed_hits, start=1):
+            if score <= 0.0:
+                continue
             signals_by_candidate.setdefault(cid, set()).add(f"embed:{rank}")
 
     if not signals_by_candidate:
@@ -84,7 +91,18 @@ def generate_candidates(
     if not survivors:
         return CandidateSet(source_entity_id=entity.source_id, candidates=())
 
-    sorted_cids = sorted(survivors.keys())
+    # Overflow truncation: lexically-corroborated candidates (any
+    # token:/trigram: signal) outrank embed-only ones — the embedding
+    # channel emits top_k hits even at near-zero cosine, and pre-8a
+    # behavior (token+trigram surfacing) must survive model install.
+    # canonical_id order within each group keeps output deterministic.
+    sorted_cids = sorted(
+        survivors.keys(),
+        key=lambda cid: (
+            all(s.startswith("embed:") for s in survivors[cid]),
+            cid,
+        ),
+    )
     if len(sorted_cids) > CANDIDATE_CAP:
         _logger.warning(
             "candidate cap exceeded: %d candidates for source_id=%s; truncating to %d",

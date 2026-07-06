@@ -649,4 +649,5 @@ def llm_assess(
         cluster_conflict=disposition.cluster_conflict,
         llm_assessment=assessment,
         tenant_id=disposition.tenant_id,
+        abbreviation_rescue=disposition.abbreviation_rescue,
     )

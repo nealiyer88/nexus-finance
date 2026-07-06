@@ -10,6 +10,7 @@ raising. Integration tests that need the model are gated with
 
 from __future__ import annotations
 
+import functools
 import math
 import pathlib
 from typing import Optional
@@ -40,11 +41,18 @@ def _load_model():
     return _model
 
 
+@functools.lru_cache(maxsize=4096)
 def embed(name: str) -> Optional[tuple[float, ...]]:
     """Return the average fastText word vector for `name` as a float tuple.
 
     Returns None for empty / whitespace-only input or when the model file
     is absent. Never raises.
+
+    LRU-cached: Stage 3 embeds the same query name once per candidate
+    and Stage 2c embeds it again — the cache collapses those to one
+    model lookup per distinct name. Safe because the function is pure
+    for a given process (model load is itself cached and never
+    retried).
     """
     if not name or not name.strip():
         return None
