@@ -21,3 +21,11 @@ Watch for: model tiering (Opus debate / Sonnet build / Haiku narrate), per-featu
 ### 2026-07-02T02:24:37 · 8A · 🛡️ code-review mutated the repo out of lane — hard-reverted to 2f28b9e8. Reviewers/gates are read-only.
 
 ### 2026-07-02T02:24:37 · 8A · 🔍 qa review running
+
+### Run starting 2026-07-05T22:12:44 — features 8b → 10 → 11 (skill-driven, interactive session)
+
+8a merged to main via PR #11 earlier tonight. This run processes the three unblocked queue rows in dependency order: **8b b3-transactions-table-and-amount-signal** (completes Signal Set B), **10 resolution-graph-update** (Stage 6), **11 approval-queue** (dashboard). Feature 11 branches from 10's tip (hard dependency). Heartbeat entries per phase below.
+
+### 2026-07-05T22:12:44 · 8B · 🥊 adversary debate running (design / skeptic / engineer)
+
+### 2026-07-05T22:17:50 · 8B · 🥊 debate reconciled → hardened design committed (build-as-one won; join keys, month periods, max-anchored symmetric tolerance pinned). 📝 prompt generated. 🔨 build starting
