@@ -6,10 +6,10 @@ Architectural guardrails for V1 Claude Code sessions. This file is loaded every 
 
 - Connectors: QuickBooks Online (category: accounting) + RUDDR (category: psa). No others.
 - Write path: Shadow Ledger preview only. No live write-back to source systems.
-- Matching stack: RapidFuzz (token_set_ratio, partial_ratio, Jaro-Winkler) + pre-trained fastText cosine similarity (Signal Set C) + n-gram Jaccard (supplementary) + graph-corroborated adaptive scoring (Signal Set B — six enumerated signals B1–B6, total boost capped at +0.20, all boosts logged) + category-pair weight dispatch via `Dict[Tuple[str, str], WeightConfig]`.
+- Matching stack: RapidFuzz (token_set_ratio, partial_ratio, Jaro-Winkler) + pre-trained fastText cosine similarity (Signal Set C) + n-gram Jaccard (supplementary) + graph-corroborated adaptive scoring (Signal Set B — six enumerated signals B1–B6; B1/B2/B4/B5/B6 shipped in 8a, B3 lands with feature 8b's transactions table; total boost capped at +0.20, all boosts logged) + category-pair weight dispatch via `Dict[Tuple[str, str], WeightConfig]`.
 - Blocking: TokenIndex + trigram n-gram index + pre-trained fastText ANN (Stage 2c). Pre-trained vectors only — zero corpus dependency.
 - Graph store: SQLite with explicit edge tables carrying category metadata.
-- LLM fallback: Claude API, redacted, Tier 3 only (<15% of entities, 0.50–0.70 confidence band). Never auto-approves.
+- LLM fallback: Claude API, redacted, Tier 3 only (<15% of entities, 0.50–0.70 confidence band; abbreviation-heuristic pairs in that band skip the LLM and route straight to human review — see §5). Never auto-approves.
 
 ## 2. CROSS-CATEGORY EXAMPLE
 
@@ -80,6 +80,7 @@ corroborating evidence — accounting↔psa proves the V1 thesis.
 - `AUTO_APPROVE = 0.90`
 - `SURFACE = 0.70` (route to human review queue)
 - `NO_MATCH = 0.50`
+- Abbreviation rescue (8a, approved 2026-07-05): PSA↔Accounting pairs whose abbreviation heuristic fired and whose score lands in [0.50, 0.70) route to the human review queue instead of the LLM (`Disposition.abbreviation_rescue = True`).
 - `AMOUNT_TOLERANCE = min(TotalAmt * 0.02, $500)`
 - `CONFIDENCE_DECAY = 18 months` (cross-category edges decay faster)
 

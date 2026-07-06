@@ -7,6 +7,7 @@ supabase==2.9.0
 
 # Matching engine
 rapidfuzz==3.9.0
+compress-fasttext==0.1.5
 
 # LLM fallback (Tier 3 only)
 anthropic==0.39.0

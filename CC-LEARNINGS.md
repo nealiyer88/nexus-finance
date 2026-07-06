@@ -109,3 +109,27 @@ When the rocket loop deadlocked on 8a, the natural reaction was to ship a smalle
 
 ### TRICK — Treat `features/REVIEW_OVERRIDES.md` as a forensic audit log
 rocket.sh appends one entry every time a guard reverts a reviewer/gate mutation. Each entry records timestamp, slug, role, and the SHA reverted to. After a BLOCK, this file tells you exactly how chaotic the review loop got. In this run: 10 entries across 3 iterations — confirms reviewer agents are not respecting their read-only contract.
+
+
+## 2026-07-05 — 8a v2 recovery: measured-reality beats spec assumption (manual finish after killed run)
+
+### FAILED — v4 spec premise was empirically false: pre-trained fastText cosine cannot lift abbreviation pairs
+The brief (and v4 §5) assumed subword cosine bridges `pacrim tech` ↔ `pacific rim technologies international`. Measured on the actual compress-fasttext model: pair cosine 0.2526, token-level `pacrim`↔`pacific` ≈ −0.002 — and the designated NEGATIVE pair (brightpath/luminos) had HIGHER token cosine (0.46) than the positive pair. Under a sum-to-1.0 budget, score → cosine as the weight grows, so no weight exists that lifts a sub-0.70-cosine pair above SURFACE. Lesson: before building a scoring criterion on an embedding signal, MEASURE the signal on the actual fixture pairs with the actual artifact — one hour of measurement would have prevented three review rounds, a killed run, and a blocked queue row.
+
+### FAILED — review loop overran its max-3-rounds contract (5+ rounds, seesaw)
+rocket.sh's QA↔fix loop does not hard-stop at the documented 3 iterations when verdicts alternate FAIL axes. Patch upstream: enforce the cap in the loop driver, not the prompt.
+
+### FAILED — vacuous monkeypatch false-passed a core criterion for 3 QA rounds
+`mock.patch.object(weights_module, "get_weights", ...)` never affected scoring.py, which had `from ... import get_weights` (local binding). The test asserted against the UNpatched path and "passed". Combined with @skipif(model absent), the SC-5 criterion was never actually executed in CI. Lessons: (1) patch where the name is LOOKED UP (`core.matching.scoring.get_weights`) or call through the module attribute; (2) a model-gated test that has never run because nobody downloaded the model is not a test — fetch the artifact in at least one environment before trusting the gate; (3) prefer stub-data tables through the REAL code path over patching the code path itself.
+
+### WORKED — RESUME file with an explicit STOP condition
+The parked run's RESUME_8A.md pre-committed a decision tree ("if the algebra shows 0.70 unreachable without breaking SC-7, STOP and re-open the brief"). The algebra hit exactly that branch; the session stopped, presented three options with measured numbers, and got a human decision (disposition rescue) in minutes. Park notes that encode the *decision criteria*, not just state, make the resume session decisive instead of re-exploratory.
+
+### WORKED — dual-mode test discipline for optional-artifact features
+Every scoring change was validated in BOTH modes (model present: 340 green; model absent: 338+2 skips) by moving the model file aside. The no-model path is pinned bit-identical to pre-8a by construction (absent signal excluded from numerator AND budget). Any feature with an optional heavy artifact should run its suite both ways in the same session.
+
+### TRICK — mid-run infra commits on the run branch trigger reviewer FILE-PATHS blocking
+rocket.sh commits (heartbeat, model-tier default) landed on the run branch mid-run and were reverted by the fixer to "clean the diff", then had to be re-restored in the park commit. Commit infra changes on a separate branch, or pre-declare them in the build prompt's expected-paths list.
+
+### TRICK — chmod-444 + atomic-rename protected the live script (re-confirmed)
+Same guard as the 2026-06-21 run; zero self-mutation events this run. Keep it.

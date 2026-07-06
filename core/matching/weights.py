@@ -16,6 +16,16 @@ tuning surface is interpretable and grep-able.
   in the sum-to-1.0 invariant.
 - One additive `abbreviation_bonus`, gated by the PSA shortcode
   heuristic. NOT included in the sum-to-1.0 (it's upside, not budget).
+- One `fasttext_cosine` weight with DYNAMIC-BUDGET semantics (8a):
+  it joins the tier-1 budget only for pairs where an embedding was
+  computed for both names, and Stage 3 renormalizes the whole tier-1
+  sum by the enlarged budget. Tuning consequence: raising this weight
+  proportionally DILUTES every other signal (divisor grows), and only
+  on embedding-available pairs — deployments without the model file
+  score as if this weight were 0. It is deliberately small: measured
+  real-model cosines on true abbreviation pairs run 0.25–0.37, so the
+  signal corroborates rather than lifts (see the SC-5 amendment in
+  features/pipeline/fasttext-signal-retrofit.md).
 - `profile_id` for debuggability: surfaces on every `ScoredMatch`.
 """
 
@@ -33,6 +43,7 @@ class WeightConfig:
     ngram_jaccard: float
     alias_boost: float
     abbreviation_bonus: float
+    fasttext_cosine: float
     profile_id: str
 
 
@@ -44,6 +55,7 @@ DEFAULT_WEIGHTS: WeightConfig = WeightConfig(
     ngram_jaccard=0.10,
     alias_boost=0.15,
     abbreviation_bonus=0.0,
+    fasttext_cosine=0.05,
     profile_id="default_v1",
 )
 
@@ -56,6 +68,7 @@ PSA_ACCOUNTING_WEIGHTS: WeightConfig = WeightConfig(
     ngram_jaccard=0.10,
     alias_boost=0.15,
     abbreviation_bonus=0.20,
+    fasttext_cosine=0.12,
     profile_id="psa_accounting_v1",
 )
 

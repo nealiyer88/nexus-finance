@@ -21,6 +21,17 @@ regardless of whether the top score is in the AUTO_APPROVE band. The
 override never UPGRADES a lower-band action — QUEUE_FOR_REVIEW or
 LLM_FALLBACK bands stay where they are.
 
+Abbreviation rescue (SC-5, amended 2026-07-05): when the top match's
+PSA↔Accounting abbreviation heuristic fired AND its score is in the
+LLM_FALLBACK band [0.50, 0.70), the action is upgraded to
+QUEUE_FOR_REVIEW. Measured on the real pre-trained fastText model,
+abbreviation pairs like 'pacrim tech' ↔ 'pacific rim technologies
+international' cannot reach 0.70 through any weighted-signal
+combination (embedding cosine ≈ 0.25); the deterministic heuristic is
+strictly better evidence than a redacted Tier-3 LLM guess, so these
+pairs go straight to the human review queue. The rescue never lifts a
+NO_MATCH (< 0.50), and never touches the AUTO_APPROVE band.
+
 Tie-break: when two ScoredMatches have identical scores, they are
 sorted ascending by `canonical_id` (matching Stage 3's existing
 ordering convention). This makes test outcomes deterministic.
@@ -117,8 +128,17 @@ def apply_thresholds(
             cluster_conflict = True
 
     final_action: Action = base_action
+    abbreviation_rescue = False
     if cluster_conflict and base_action == "AUTO_APPROVE":
         final_action = "QUEUE_FOR_REVIEW"
+    elif (
+        base_action == "LLM_FALLBACK"
+        and top.signal_breakdown.abbreviation_bonus_fired
+    ):
+        # Abbreviation rescue (module docstring): heuristic-fired
+        # mid-band pairs route to human review, not the LLM.
+        final_action = "QUEUE_FOR_REVIEW"
+        abbreviation_rescue = True
 
     return Disposition(
         source_entity_id=source_entity_id,
@@ -128,4 +148,5 @@ def apply_thresholds(
         cluster_conflict=cluster_conflict,
         llm_assessment=None,
         tenant_id=tenant_id,
+        abbreviation_rescue=abbreviation_rescue,
     )

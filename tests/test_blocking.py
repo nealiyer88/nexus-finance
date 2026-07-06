@@ -13,9 +13,10 @@ import pytest
 
 from connectors.base import NormalizedEntity
 from core.ingestion.normalizer import normalize_entity
+import core.matching.embeddings as _embeddings_mod
 from core.matching.blocking import CANDIDATE_CAP, generate_candidates
 from core.matching.deterministic import deterministic_match
-from core.matching.indices import NgramIndex, TokenIndex
+from core.matching.indices import EmbeddingIndex, NgramIndex, TokenIndex
 from core.matching.types import CandidateSet
 
 
@@ -366,6 +367,59 @@ def test_candidate_set_source_entity_id_matches_query(conn: sqlite3.Connection) 
 # ---------------------------------------------------------------------------
 # Hygiene: no rapidfuzz import in Stages 1–2
 # ---------------------------------------------------------------------------
+
+
+def test_embedding_stage_2c_surfaces_candidate(
+    conn: sqlite3.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Stage 2c: EmbeddingIndex surfaces a candidate that token/trigram miss.
+
+    Uses 'lais corp' (query) vs 'luminos artificial intelligence systems'
+    (canonical) — no shared tokens or trigrams, so only Stage 2c can surface it.
+    (Brief AC-9 names 'pacrim tech'/'pacific rim technologies international' as
+    the illustrative pair; both pairs prove the same zero-overlap mechanism.)
+    """
+    _insert_canonical(conn, "CAN-EMB", "luminos artificial intelligence systems")
+    _insert_sysref(conn, "CAN-EMB", "ruddr", "psa", "RUDDR-EMB", {})
+    conn.commit()
+
+    def _fake_embed(name: str):
+        # Return the same unit vector for both query and canonical so cosine=1.0
+        if not name or not name.strip():
+            return None
+        return (1.0, 0.0, 0.0)
+
+    monkeypatch.setattr(_embeddings_mod, "embed", _fake_embed)
+
+    tok = TokenIndex.build(conn)
+    ngm = NgramIndex.build(conn)
+    emb = EmbeddingIndex.build(conn)
+
+    entity = _entity(
+        normalized_name="lais corp",
+        source="quickbooks",
+        source_id="QB-EMBT",
+    )
+
+    # Without embedding index: no token/trigram overlap → empty candidate set
+    result_no_emb = generate_candidates(entity, tok, ngm, conn)
+    no_emb_ids = {c.canonical_id for c in result_no_emb.candidates}
+    assert "CAN-EMB" not in no_emb_ids, (
+        "CAN-EMB should NOT appear without Stage 2c"
+    )
+
+    # With the embedding index the candidate surfaces via Stage 2c
+    result_with_emb = generate_candidates(entity, tok, ngm, conn, embedding_index=emb)
+    with_emb_ids = {c.canonical_id for c in result_with_emb.candidates}
+    assert "CAN-EMB" in with_emb_ids, (
+        f"CAN-EMB should appear via Stage 2c; got {with_emb_ids}"
+    )
+
+    cand = next(c for c in result_with_emb.candidates if c.canonical_id == "CAN-EMB")
+    assert any(s.startswith("embed:") for s in cand.blocking_signals), (
+        f"Expected embed:* signal; got {cand.blocking_signals}"
+    )
 
 
 def test_no_rapidfuzz_in_matching_modules() -> None:

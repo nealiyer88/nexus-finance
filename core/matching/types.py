@@ -9,7 +9,10 @@ overlapping result types.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional
+
+if TYPE_CHECKING:
+    from core.matching.scoring import BoostEntry
 
 
 MatchKeyType = Literal["alias_exact", "email", "employee_id"]
@@ -47,6 +50,13 @@ class SignalBreakdown:
     0..1. Boolean fields record whether the additive bonuses fired.
     All five weighted signals are always present (even when zero) so
     debug output can compare a scorer pass to its weight profile.
+    `fasttext_cosine` is 0.0 when the model file is absent.
+
+    `fasttext_available` distinguishes "cosine is genuinely 0.0" from
+    "no embedding could be computed" (model absent / OOV-empty input).
+    Stage 3 renormalizes the weight budget over available signals, so
+    this flag decides whether `fasttext_cosine`'s weight participates
+    in the sum-to-1.0 budget for the pair.
     """
 
     token_sort_ratio: float
@@ -56,11 +66,19 @@ class SignalBreakdown:
     ngram_jaccard: float
     alias_boost_fired: bool
     abbreviation_bonus_fired: bool
+    fasttext_cosine: float = 0.0
+    fasttext_available: bool = False
+    b_boosts: tuple[BoostEntry, ...] = ()
 
 
 @dataclass(frozen=True)
 class GraphEvidence:
-    """Stage 3's graph-corroborated additive bonuses.
+    """Shared-neighbor evidence observed for the pair — a REPORT, not a
+    score contribution. Since the 8a Signal Set B retrofit, the applied
+    graph boosts live in `SignalBreakdown.b_boosts` (band-gated,
+    +0.20-capped); the `*_bonus` fields here are the legacy-formula
+    values derived from the same counts and may legitimately be nonzero
+    on pairs whose score received no boost (base outside the B band).
 
     On a fresh DB with no `entity_edges` rows (V1 default; Stage 6
     owns writes), all four fields are 0 / 0.0. Tests seed edges
@@ -135,13 +153,19 @@ class LLMAssessment:
 class Disposition:
     """Stage 4 result. In-memory only — Stage 4 does not write to SQLite.
 
-    - `action` is the band derived from `top_match.score`, with override
-      to QUEUE_FOR_REVIEW when `cluster_conflict` is True.
+    - `action` is the band derived from `top_match.score`, with two
+      overrides: downgrade to QUEUE_FOR_REVIEW when `cluster_conflict`
+      is True, and upgrade to QUEUE_FOR_REVIEW when
+      `abbreviation_rescue` is True (SC-5 amended 2026-07-05).
     - `top_match` is None iff `action == NO_MATCH` (no candidate ≥ 0.50).
     - `candidates_ranked` is the deduped-by-canonical_id input tuple,
       sorted descending by (score, ascending canonical_id).
     - `cluster_conflict` is True iff the top-2 distinct canonicals both
       score ≥ SURFACE_THRESHOLD AND are not linked by a SAME_AS edge.
+    - `abbreviation_rescue` is True iff the action was upgraded from
+      LLM_FALLBACK because the top match's PSA↔Accounting abbreviation
+      heuristic fired — recorded so the review queue (feature 11) can
+      show WHY a sub-SURFACE item is queued without re-deriving bands.
     - `llm_assessment` is populated only after Stage 5 runs.
     - `tenant_id` is propagated from the orchestrator for downstream
       tenant-scoped writes (e.g., the llm_training_data row).
@@ -154,3 +178,4 @@ class Disposition:
     cluster_conflict: bool
     llm_assessment: Optional[LLMAssessment]
     tenant_id: Optional[str]
+    abbreviation_rescue: bool = False
