@@ -19,8 +19,22 @@ Scores `(NormalizedEntity, candidate canonical)` pairs surfaced by Stage 2
 
 Final formula:
 
-    base_score = weighted_sum(A signals) + alias_boost + abbreviation_bonus
+    budget     = sum of tier-1 weights available for the pair
+                 (five string metrics + alias_boost, plus fasttext_cosine
+                 only when an embedding was computed for BOTH names)
+    base_score = weighted_sum(available A signals) / budget
+                 + abbreviation_bonus
     score      = clamp(base_score + sum(b_boost.applied), 0.0, 1.0)
+
+Dynamic renormalization: the tier-1 weights are configured to sum to
+1.0 WITHOUT `fasttext_cosine` (`test_weights_sum_to_one`). When the
+embedding model is absent (or either name is OOV-empty), the fastText
+slot is excluded from both numerator and budget, so the no-model path
+divides by exactly 1.0 and scores byte-identically to the pre-8a
+stack. When embeddings are available, the budget grows by the
+fastText weight and the whole tier-1 sum renormalizes to a 1.0
+ceiling — an absent signal never consumes weight, and a present one
+never inflates the budget past 1.0 (AC-5).
 
 This module is the only matcher module that imports `rapidfuzz`. Stages
 1, 2, and 0 do not (enforced by
@@ -33,7 +47,6 @@ import json
 import re
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Literal, Optional
 
 from rapidfuzz import fuzz
@@ -180,6 +193,8 @@ def _compute_b_boosts(
     candidate_external_fields: dict,
     base_score: float,
     tenant_id: Optional[str] = None,
+    person_count: Optional[int] = None,
+    neighbor_count: Optional[int] = None,
 ) -> tuple[BoostEntry, ...]:
     """Compute Signal Set B (B1, B2, B4, B5, B6) adaptive boosts.
 
@@ -187,6 +202,10 @@ def _compute_b_boosts(
     apply in the ambiguous band where they are load-bearing evidence.
     Total applied boost is capped at MAX_B_BOOST (+0.20); distributed
     proportionally when the sum of raw boosts would exceed the cap.
+
+    `person_count` / `neighbor_count` accept shared-neighbor counts the
+    caller already queried (score_pair queries them once for
+    GraphEvidence per AC-23); None falls back to querying here.
     """
     if base_score < 0.70 or base_score >= 0.90:
         return ()
@@ -194,7 +213,11 @@ def _compute_b_boosts(
     raws: list[tuple[Literal["B1", "B2", "B4", "B5", "B6"], float]] = []
 
     # B1 — shared person neighbors (+0.05/person, cap 0.10)
-    n_persons = count_shared_person_neighbors(conn, source_id, candidate_id, tenant_id)
+    n_persons = (
+        person_count
+        if person_count is not None
+        else count_shared_person_neighbors(conn, source_id, candidate_id, tenant_id)
+    )
     b1_raw = min(n_persons * 0.05, 0.10)
     if b1_raw > 0:
         raws.append(("B1", b1_raw))
@@ -227,7 +250,11 @@ def _compute_b_boosts(
             raws.append(("B5", b5_raw))
 
     # B6 — shared graph neighbors of any category (+0.025/node, cap 0.10)
-    n_neighbors = count_shared_graph_neighbors(conn, source_id, candidate_id, tenant_id)
+    n_neighbors = (
+        neighbor_count
+        if neighbor_count is not None
+        else count_shared_graph_neighbors(conn, source_id, candidate_id, tenant_id)
+    )
     b6_raw = min(n_neighbors * 0.025, 0.10)
     if b6_raw > 0:
         raws.append(("B6", b6_raw))
@@ -273,6 +300,65 @@ def ngram_jaccard(a: str, b: str) -> float:
     return len(grams_a & grams_b) / len(union)
 
 
+ABBREV_MIN_PREFIX_LEN: int = 3
+ABBREV_MIN_CONCAT_PART_LEN: int = 2
+
+
+def _is_concat_of_token_prefixes(token: str, long_tokens: list[str]) -> bool:
+    """True when `token` is a concatenation of prefixes (each
+    ≥ ABBREV_MIN_CONCAT_PART_LEN chars) of 2+ CONSECUTIVE tokens of
+    `long_tokens` — the 'pacrim' = 'pac|rim' over 'pacific rim' pattern.
+    The whole token must be consumed."""
+
+    def consume(rest: str, idx: int, depth: int) -> bool:
+        if not rest:
+            return depth >= 2
+        if idx >= len(long_tokens):
+            return False
+        tok = long_tokens[idx]
+        hi = min(len(rest), len(tok))
+        for take in range(ABBREV_MIN_CONCAT_PART_LEN, hi + 1):
+            if tok[:take] == rest[:take] and consume(rest[take:], idx + 1, depth + 1):
+                return True
+        return False
+
+    return any(consume(token, start, 0) for start in range(len(long_tokens) - 1))
+
+
+def _tokens_abbreviate(short_name: str, long_name: str) -> bool:
+    """Token-level abbreviation test: the side with strictly FEWER
+    whitespace-tokens abbreviates the other iff EVERY short-side token
+    either (i) appears verbatim in the long side, (ii) is a
+    ≥3-char proper prefix of some long-side token ('tech' →
+    'technologies', 'cap' → 'capital'), or (iii) is a concatenation of
+    prefixes of consecutive long-side tokens ('pacrim' → 'pacific
+    rim') — AND at least one token matched via (ii)/(iii). All-verbatim
+    subsets ('cenlar' ⊂ 'cenlar fsb') are truncations, not
+    abbreviations: token_set_ratio already scores them 100, and firing
+    the bonus there would rank a truncated candidate above an exact
+    match. Equal token counts never fire — plain string metrics own
+    that regime."""
+    ta = [t for t in short_name.split() if t]
+    tb = [t for t in long_name.split() if t]
+    if not ta or not tb or len(ta) == len(tb):
+        return False
+    short, long_ = (ta, tb) if len(ta) < len(tb) else (tb, ta)
+    any_abbreviated = False
+    for t in short:
+        if t in long_:
+            continue
+        if len(t) >= ABBREV_MIN_PREFIX_LEN and any(
+            lt.startswith(t) and len(lt) > len(t) for lt in long_
+        ):
+            any_abbreviated = True
+            continue
+        if _is_concat_of_token_prefixes(t, long_):
+            any_abbreviated = True
+            continue
+        return False
+    return any_abbreviated
+
+
 def _check_psa_abbreviation(
     entity_name: str,
     candidate_name: str,
@@ -294,12 +380,31 @@ def _check_psa_abbreviation(
         (ii) shortcode equals the consonant-skeleton initials of the
              long side (first letter of each token, lowercased).
 
+    Token-level extension (SC-5 amended): independent of the ≤4-char
+    shortcode branch, multi-word abbreviations fire when every token of
+    the fewer-token side abbreviates the other side (verbatim token,
+    ≥3-char prefix, or concatenated consecutive prefixes) — catches
+    'pacrim tech' ↔ 'pacific rim technologies international' and
+    'meridian cap' ↔ 'meridian capital group'. This branch is
+    side-agnostic within the PSA↔Accounting pair: QB abbreviates RUDDR
+    names as often as the reverse in the ground-truth fixture.
+    Measured on the real pre-trained fastText model (2026-07-05),
+    embedding cosine cannot separate these pairs (pacrim↔pacific
+    cosine ≈ 0.0), so this deterministic heuristic is the abbreviation
+    signal, with Stage 4 routing heuristic-fired mid-band pairs to the
+    review queue.
+
     The CAN-019 rebrand pair (Stratos Cloud / CloudNine Infrastructure)
-    is safe: both sides are >4 chars, so the heuristic does not fire.
+    is safe: the shortcode branch needs a ≤4-char side, and the
+    token-level branch needs unequal token counts plus full coverage —
+    'stratos' matches nothing in 'cloudnine infrastructure'.
     """
     pair = (entity_category, candidate_category)
     if pair not in (("accounting", "psa"), ("psa", "accounting")):
         return False
+
+    if _tokens_abbreviate(entity_name.strip().lower(), candidate_name.strip().lower()):
+        return True
 
     candidates: list[tuple[str, str]] = []  # (shortcode, long_side)
 
@@ -386,10 +491,10 @@ def _compute_signal_breakdown(
         entity_category=entity_category,
         candidate_category=candidate_category,
     )
-    ft_cosine = _embeddings.cosine(
-        _embeddings.embed(entity_name),
-        _embeddings.embed(candidate_name),
-    )
+    vec_entity = _embeddings.embed(entity_name)
+    vec_candidate = _embeddings.embed(candidate_name)
+    ft_available = vec_entity is not None and vec_candidate is not None
+    ft_cosine = _embeddings.cosine(vec_entity, vec_candidate)
     return SignalBreakdown(
         token_sort_ratio=token_sort,
         token_set_ratio=token_set,
@@ -399,26 +504,19 @@ def _compute_signal_breakdown(
         alias_boost_fired=alias_fired,
         abbreviation_bonus_fired=abbrev_fired,
         fasttext_cosine=ft_cosine,
+        fasttext_available=ft_available,
     )
 
 
 def _compute_graph_evidence(
-    conn: sqlite3.Connection,
-    source_canonical_id: Optional[str],
-    candidate_canonical_id: str,
-    tenant_id: Optional[str],
+    person_count: int,
+    overlap_count: int,
 ) -> GraphEvidence:
-    """Query the graph store for shared-neighbor evidence. Returns
-    `_ZERO_EVIDENCE` semantically when `source_canonical_id` is None
-    or no edges connect the endpoints."""
-    person_count = count_shared_person_neighbors(
-        conn, source_canonical_id, candidate_canonical_id, tenant_id
-    )
+    """Derive shared-neighbor evidence from counts the caller already
+    queried (AC-23: one query per count per pair — the same counts feed
+    Signal Set B). Semantically `_ZERO_EVIDENCE` when both counts are 0."""
     person_bonus = min(
         MAX_SHARED_PERSON_BONUS, person_count * PER_SHARED_PERSON_BONUS
-    )
-    overlap_count = count_shared_graph_neighbors(
-        conn, source_canonical_id, candidate_canonical_id, tenant_id
     )
     overlap_bonus = min(
         MAX_NEIGHBORHOOD_BONUS, overlap_count * PER_NEIGHBORHOOD_NODE_BONUS
@@ -434,19 +532,38 @@ def _compute_graph_evidence(
 def _base_weighted_score(
     weights: WeightConfig, breakdown: SignalBreakdown
 ) -> float:
-    """Weighted string+embedding sum plus alias/abbreviation bonuses; not clamped."""
+    """Weighted tier-1 sum renormalized over available signals, plus the
+    abbreviation bonus; not clamped.
+
+    The tier-1 budget is the five string weights + alias_boost
+    (configured to sum to exactly 1.0 — `test_weights_sum_to_one`),
+    plus `fasttext_cosine` ONLY when `breakdown.fasttext_available`.
+    Dividing by the budget keeps the tier-1 ceiling at 1.0 whether or
+    not the embedding model is present (AC-5); the no-model path
+    divides by exactly 1.0 and reproduces the pre-8a score bit-for-bit.
+    `abbreviation_bonus` stays outside the budget (upside, not budget).
+    """
     weighted_sum = (
         weights.token_sort_ratio * breakdown.token_sort_ratio / 100.0
         + weights.token_set_ratio * breakdown.token_set_ratio / 100.0
         + weights.partial_ratio * breakdown.partial_ratio / 100.0
         + weights.jaro_winkler * breakdown.jaro_winkler / 100.0
         + weights.ngram_jaccard * breakdown.ngram_jaccard
-        + weights.fasttext_cosine * breakdown.fasttext_cosine
     )
-    return (
-        weighted_sum
-        + (weights.alias_boost if breakdown.alias_boost_fired else 0.0)
-        + (weights.abbreviation_bonus if breakdown.abbreviation_bonus_fired else 0.0)
+    budget = (
+        weights.token_sort_ratio
+        + weights.token_set_ratio
+        + weights.partial_ratio
+        + weights.jaro_winkler
+        + weights.ngram_jaccard
+        + weights.alias_boost
+    )
+    if breakdown.fasttext_available:
+        weighted_sum += weights.fasttext_cosine * breakdown.fasttext_cosine
+        budget += weights.fasttext_cosine
+    weighted_sum += weights.alias_boost if breakdown.alias_boost_fired else 0.0
+    return weighted_sum / budget + (
+        weights.abbreviation_bonus if breakdown.abbreviation_bonus_fired else 0.0
     )
 
 
@@ -506,6 +623,15 @@ def score_pair(
 
     base_score = _base_weighted_score(weights, breakdown)
 
+    # Shared-neighbor counts queried ONCE per pair (AC-23): the same
+    # counts drive Signal Set B (B1, B6) and GraphEvidence.
+    person_count = count_shared_person_neighbors(
+        conn, source_canonical_id, candidate_id, tenant_id
+    )
+    neighbor_count = count_shared_graph_neighbors(
+        conn, source_canonical_id, candidate_id, tenant_id
+    )
+
     candidate_ext = _get_candidate_external_fields(conn, candidate_id, tenant_id)
     b_boosts = _compute_b_boosts(
         conn=conn,
@@ -517,11 +643,13 @@ def score_pair(
         candidate_external_fields=candidate_ext,
         base_score=base_score,
         tenant_id=tenant_id,
+        person_count=person_count,
+        neighbor_count=neighbor_count,
     )
 
     score = _weighted_score(weights, breakdown, b_boosts)
 
-    evidence = _compute_graph_evidence(conn, source_canonical_id, candidate_id, tenant_id)
+    evidence = _compute_graph_evidence(person_count, neighbor_count)
 
     final_breakdown = SignalBreakdown(
         token_sort_ratio=breakdown.token_sort_ratio,
@@ -532,6 +660,7 @@ def score_pair(
         alias_boost_fired=breakdown.alias_boost_fired,
         abbreviation_bonus_fired=breakdown.abbreviation_bonus_fired,
         fasttext_cosine=breakdown.fasttext_cosine,
+        fasttext_available=breakdown.fasttext_available,
         b_boosts=b_boosts,
     )
 

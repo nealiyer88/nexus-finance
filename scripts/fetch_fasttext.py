@@ -21,12 +21,19 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 MODEL_PATH = _REPO_ROOT / "models" / "cc.en.300-compress.bin"
 
 # Pre-compressed English Common Crawl fastText model saved in the
-# compress-fasttext (CompressedFastTextKeyedVectors) serialization format.
-# Produced by: compress_fasttext.prune_ft_freq(gensim_ft_model, pq=True)
-# Source repository: https://github.com/avidale/compress-fasttext
+# compress-fasttext (CompressedFastTextKeyedVectors) serialization format
+# (freq-pruned to 400K/100K vocab + product quantization).
+# Published as a GitHub release asset of the compress-fasttext repo —
+# the storage.yandexcloud.net mirror previously referenced here 404s.
 MODEL_URL = (
-    "https://storage.yandexcloud.net/nlp/compress-fasttext/models/"
-    "cc.en.300-compress.bin"
+    "https://github.com/avidale/compress-fasttext/releases/download/"
+    "gensim-4-draft/ft_cc.en.300_freqprune_400K_100K_pq_300.bin"
+)
+
+# SHA256 of the release asset, verified on download 2026-07-05. The
+# download aborts (and the partial file is removed) on any mismatch.
+EXPECTED_SHA256 = (
+    "ec32a88dbc1170652d99ca512108ff73594a76bdbda2b4840ebf96833812e696"
 )
 
 
@@ -55,6 +62,10 @@ def main() -> None:
         urllib.request.urlretrieve(MODEL_URL, tmp_path)
         sha = _sha256(tmp_path)
         print(f"[fetch_fasttext] SHA256: {sha}")
+        if sha != EXPECTED_SHA256:
+            raise RuntimeError(
+                f"SHA256 mismatch: expected {EXPECTED_SHA256}, got {sha}"
+            )
         tmp_path.rename(MODEL_PATH)
         print(f"[fetch_fasttext] saved to {MODEL_PATH}")
     except Exception as exc:

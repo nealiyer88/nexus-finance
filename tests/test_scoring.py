@@ -17,13 +17,16 @@ from typing import Any, Optional
 import pytest
 
 from core.ingestion.normalizer import normalize_entity
+from core.matching.disposition import apply_thresholds
 from core.matching.embeddings import _model_present
 from core.matching.scoring import (
     MAX_B_BOOST,
     MAX_NEIGHBORHOOD_BONUS,
     MAX_SHARED_PERSON_BONUS,
+    _base_weighted_score,
     _check_psa_abbreviation,
     _compute_b_boosts,
+    _tokens_abbreviate,
     ngram_jaccard,
     score_candidate_set,
     score_pair,
@@ -973,56 +976,211 @@ def test_ac25_brightpath_vs_luminos_scores_below_no_match(conn: sqlite3.Connecti
 
 
 # ---------------------------------------------------------------------------
-# 13. Signal Set C integration test (model-gated)
+# 13. SC-5 (amended 2026-07-05): abbreviation pairs reach the review queue
+#
+# Measured on the real pre-trained model, the SC-5 pairs' cosines are
+# LOW (pacrim 0.2526, meridian 0.3679; token-level pacrim↔pacific
+# ≈ 0.0), so no fasttext weight can lift 'pacrim tech' above 0.70 —
+# the composite converges toward the cosine as the weight grows. The
+# amended criterion: both pairs land in the human review queue, via
+# composite score (meridian) or the Stage 4 abbreviation rescue
+# (pacrim). The stub vector table below pins the pair cosines at the
+# measured real-model values so the full scoring path (no vacuous
+# patching — QA-006) runs deterministically without the model file.
 # ---------------------------------------------------------------------------
 
 
+import unittest.mock as _sc5_mock
+
+_SC5_STUB_VECTORS: dict[str, tuple[float, ...]] = {
+    # cosine('pacrim tech', 'pacific rim...') = 0.2526 (measured)
+    "pacrim tech": (1.0, 0.0, 0.0, 0.0),
+    "pacific rim technologies international": (0.2526, 0.96757, 0.0, 0.0),
+    # cosine('meridian cap', 'meridian capital group') = 0.3679 (measured)
+    "meridian cap": (0.0, 0.0, 1.0, 0.0),
+    "meridian capital group": (0.0, 0.0, 0.3679, 0.92987),
+}
+
+
+def _sc5_stub_embed(name: str) -> Optional[tuple[float, ...]]:
+    return _SC5_STUB_VECTORS.get(name)
+
+
+def _sc5_score_and_dispose(
+    conn: sqlite3.Connection, entity_name: str, candidate_name: str
+) -> tuple[ScoredMatch, str]:
+    cid = f"CAN-{candidate_name[:4].upper()}"
+    _insert_canonical(conn, cid, candidate_name)
+    conn.commit()
+    result = score_pair(
+        entity=_make_entity(entity_name, source="quickbooks"),
+        candidate_id=cid,
+        candidate_name=candidate_name,
+        candidate_aliases=(),
+        candidate_category="psa",
+        conn=conn,
+    )
+    disposition = apply_thresholds(entity_name, (result,), conn)
+    return result, disposition.action
+
+
+def test_sc5_pairs_route_to_review_queue_with_embeddings(
+    conn: sqlite3.Connection,
+) -> None:
+    """With embeddings available at measured real-model cosine levels:
+    'meridian cap' clears SURFACE on composite score; 'pacrim tech'
+    lands mid-band with the abbreviation heuristic fired and Stage 4
+    rescues it to QUEUE_FOR_REVIEW."""
+    with _sc5_mock.patch(
+        "core.matching.embeddings.embed", side_effect=_sc5_stub_embed
+    ):
+        meridian, meridian_action = _sc5_score_and_dispose(
+            conn, "meridian cap", "meridian capital group"
+        )
+        pacrim, pacrim_action = _sc5_score_and_dispose(
+            conn, "pacrim tech", "pacific rim technologies international"
+        )
+
+    assert meridian.signal_breakdown.fasttext_available is True
+    assert meridian.score >= 0.70, f"meridian score={meridian.score:.4f}"
+    assert meridian_action == "QUEUE_FOR_REVIEW"
+
+    assert pacrim.signal_breakdown.fasttext_available is True
+    assert pacrim.signal_breakdown.abbreviation_bonus_fired is True
+    assert 0.50 <= pacrim.score < 0.70, f"pacrim score={pacrim.score:.4f}"
+    assert pacrim_action == "QUEUE_FOR_REVIEW", (
+        "abbreviation rescue must route the mid-band pacrim pair to review"
+    )
+
+
+def test_sc5_pairs_route_to_review_queue_without_model(
+    conn: sqlite3.Connection,
+) -> None:
+    """Model-absent path (CI): same review-queue outcome for both pairs
+    via the pre-8a-identical no-model score."""
+    with _sc5_mock.patch("core.matching.embeddings.embed", return_value=None):
+        meridian, meridian_action = _sc5_score_and_dispose(
+            conn, "meridian cap", "meridian capital group"
+        )
+        pacrim, pacrim_action = _sc5_score_and_dispose(
+            conn, "pacrim tech", "pacific rim technologies international"
+        )
+
+    assert meridian.signal_breakdown.fasttext_available is False
+    assert meridian.score >= 0.70
+    assert meridian_action == "QUEUE_FOR_REVIEW"
+
+    assert pacrim.signal_breakdown.fasttext_available is False
+    assert pacrim.signal_breakdown.abbreviation_bonus_fired is True
+    assert 0.50 <= pacrim.score < 0.70
+    assert pacrim_action == "QUEUE_FOR_REVIEW"
+
+
 @pytest.mark.skipif(not _model_present(), reason="fasttext model not downloaded")
-def test_signal_c_lift_meridian_and_pacrim(conn: sqlite3.Connection) -> None:
-    """AC-10: fasttext_cosine=0.12 pushes ambiguous pairs above 0.70;
-    setting the weight to 0.0 drops them below 0.70."""
-    from dataclasses import replace
-
-    from core.matching.weights import PSA_ACCOUNTING_WEIGHTS
-
-    pairs = [
+def test_sc5_end_to_end_with_real_model(conn: sqlite3.Connection) -> None:
+    """Integration against the real downloaded model — no patching at
+    all. Both SC-5 pairs must reach the review queue."""
+    for entity_name, candidate_name in (
         ("meridian cap", "meridian capital group"),
         ("pacrim tech", "pacific rim technologies international"),
-    ]
-
-    for entity_name, candidate_name in pairs:
-        entity = _make_entity(entity_name, source="quickbooks")
-        _insert_canonical(conn, f"CAN-{candidate_name[:4].upper()}", candidate_name)
-        conn.commit()
-
-        result_with_ft = score_pair(
-            entity=entity,
-            candidate_id=f"CAN-{candidate_name[:4].upper()}",
-            candidate_name=candidate_name,
-            candidate_aliases=(),
-            candidate_category="psa",
-            conn=conn,
-        )
-        assert result_with_ft.score >= 0.70, (
-            f"With fasttext: {entity_name!r} vs {candidate_name!r} "
-            f"score={result_with_ft.score:.3f} (expected ≥0.70)"
+    ):
+        result, action = _sc5_score_and_dispose(conn, entity_name, candidate_name)
+        assert result.signal_breakdown.fasttext_available is True
+        assert action == "QUEUE_FOR_REVIEW", (
+            f"{entity_name!r} vs {candidate_name!r}: "
+            f"score={result.score:.4f} action={action}"
         )
 
-        # Disable fasttext weight to prove Signal C is load-bearing
-        no_ft_weights = replace(PSA_ACCOUNTING_WEIGHTS, fasttext_cosine=0.0)
-        from core.matching import weights as _wmod
-        import unittest.mock as _mock
 
-        with _mock.patch.object(_wmod, "get_weights", return_value=no_ft_weights):
-            result_no_ft = score_pair(
-                entity=entity,
-                candidate_id=f"CAN-{candidate_name[:4].upper()}",
-                candidate_name=candidate_name,
-                candidate_aliases=(),
-                candidate_category="psa",
-                conn=conn,
-            )
-        assert result_no_ft.score < 0.70, (
-            f"Without fasttext: {entity_name!r} vs {candidate_name!r} "
-            f"score={result_no_ft.score:.3f} (expected <0.70)"
+# ---------------------------------------------------------------------------
+# 14. Dynamic weight renormalization (AC-5: tier-1 budget sums to 1.0)
+# ---------------------------------------------------------------------------
+
+
+def test_renormalized_budget_ceiling_is_one_with_embeddings() -> None:
+    """A perfect pair (all signals maxed, alias fired, cosine 1.0) must
+    score exactly 1.0 pre-clamp — the fasttext slot renormalizes into
+    the budget instead of stacking past it."""
+    perfect = SignalBreakdown(
+        token_sort_ratio=100.0,
+        token_set_ratio=100.0,
+        partial_ratio=100.0,
+        jaro_winkler=100.0,
+        ngram_jaccard=1.0,
+        alias_boost_fired=True,
+        abbreviation_bonus_fired=False,
+        fasttext_cosine=1.0,
+        fasttext_available=True,
+    )
+    for w in (DEFAULT_WEIGHTS, PSA_ACCOUNTING_WEIGHTS):
+        base = _base_weighted_score(w, perfect)
+        assert math.isclose(base, 1.0, abs_tol=1e-9), (
+            f"profile {w.profile_id!r}: perfect-signal base={base} (expected 1.0)"
         )
+
+
+def test_fasttext_weight_inert_when_embedding_unavailable() -> None:
+    """When no embedding is available the fasttext weight must not
+    consume budget: scores are bit-identical across any configured
+    fasttext weight (pre-8a parity on the no-model path)."""
+    from dataclasses import replace
+
+    bd = SignalBreakdown(
+        token_sort_ratio=62.0,
+        token_set_ratio=71.0,
+        partial_ratio=88.0,
+        jaro_winkler=79.5,
+        ngram_jaccard=0.41,
+        alias_boost_fired=True,
+        abbreviation_bonus_fired=False,
+        fasttext_cosine=0.0,
+        fasttext_available=False,
+    )
+    w_hi = replace(PSA_ACCOUNTING_WEIGHTS, fasttext_cosine=0.5)
+    assert _base_weighted_score(PSA_ACCOUNTING_WEIGHTS, bd) == _base_weighted_score(
+        w_hi, bd
+    )
+
+
+# ---------------------------------------------------------------------------
+# 15. Token-level abbreviation heuristic
+# ---------------------------------------------------------------------------
+
+
+def test_token_level_abbreviation_fires_for_sc5_pairs() -> None:
+    assert _tokens_abbreviate(
+        "pacrim tech", "pacific rim technologies international"
+    )
+    assert _tokens_abbreviate("meridian cap", "meridian capital group")
+    # Side-agnostic: argument order must not matter.
+    assert _tokens_abbreviate(
+        "pacific rim technologies international", "pacrim tech"
+    )
+
+
+def test_token_level_abbreviation_rejects_non_matches() -> None:
+    # Rebrand pairs: no token abbreviates the other side.
+    assert not _tokens_abbreviate("brightpath machine learning", "luminos ai")
+    assert not _tokens_abbreviate("stratos cloud", "cloudnine infrastructure")
+    # Equal token counts never fire — string metrics own that regime.
+    assert not _tokens_abbreviate("acme corp", "acme corporation")
+    # Partial coverage is not enough: every short-side token must match.
+    assert not _tokens_abbreviate(
+        "pacrim holdings", "pacific rim technologies international"
+    )
+    # Pure token-subset truncations never fire: token_set_ratio already
+    # scores them 100, and the bonus would outrank an exact match.
+    assert not _tokens_abbreviate("cenlar", "cenlar fsb")
+    assert not _tokens_abbreviate("meridian capital", "meridian capital group")
+
+
+def test_token_level_abbreviation_gated_to_psa_accounting_pair() -> None:
+    """The heuristic only applies to the PSA↔Accounting category pair."""
+    fired = _check_psa_abbreviation(
+        entity_name="pacrim tech",
+        candidate_name="pacific rim technologies international",
+        candidate_aliases=(),
+        entity_category="accounting",
+        candidate_category="accounting",
+    )
+    assert fired is False

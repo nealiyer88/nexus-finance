@@ -79,7 +79,9 @@ def _insert_same_as_edge(
     )
 
 
-def _make_scored_match(canonical_id: str, score: float) -> ScoredMatch:
+def _make_scored_match(
+    canonical_id: str, score: float, abbreviation_fired: bool = False
+) -> ScoredMatch:
     return ScoredMatch(
         canonical_id=canonical_id,
         score=score,
@@ -90,7 +92,7 @@ def _make_scored_match(canonical_id: str, score: float) -> ScoredMatch:
             jaro_winkler=0.0,
             ngram_jaccard=0.0,
             alias_boost_fired=False,
-            abbreviation_bonus_fired=False,
+            abbreviation_bonus_fired=abbreviation_fired,
         ),
         graph_evidence=GraphEvidence(
             shared_person_count=0,
@@ -175,6 +177,52 @@ def test_top_below_no_match_threshold_returns_no_match(
 def test_no_match_omits_candidates_ranked_below_floor() -> None:
     """A top_match below 0.50 → NO_MATCH; the ranked tuple may still
     contain the entries (caller can inspect), but top_match is None."""
+
+
+# ---------------------------------------------------------------------------
+# 2b. Abbreviation rescue (SC-5 amended 2026-07-05)
+# ---------------------------------------------------------------------------
+
+
+def test_abbreviation_rescue_upgrades_llm_fallback_to_review(
+    conn: sqlite3.Connection,
+) -> None:
+    """Mid-band [0.50, 0.70) + abbreviation heuristic fired → the pair
+    routes to the human review queue instead of the Tier-3 LLM."""
+    disp = apply_thresholds(
+        "src-1",
+        (_make_scored_match("CAN-A", 0.60, abbreviation_fired=True),),
+        conn,
+    )
+    assert disp.action == "QUEUE_FOR_REVIEW"
+
+
+def test_no_rescue_without_abbreviation_flag(conn: sqlite3.Connection) -> None:
+    disp = apply_thresholds(
+        "src-1", (_make_scored_match("CAN-A", 0.60),), conn
+    )
+    assert disp.action == "LLM_FALLBACK"
+
+
+def test_rescue_does_not_lift_no_match(conn: sqlite3.Connection) -> None:
+    """The rescue never lifts a sub-0.50 score out of NO_MATCH."""
+    disp = apply_thresholds(
+        "src-1",
+        (_make_scored_match("CAN-A", 0.45, abbreviation_fired=True),),
+        conn,
+    )
+    assert disp.action == "NO_MATCH"
+
+
+def test_rescue_leaves_auto_approve_band_untouched(
+    conn: sqlite3.Connection,
+) -> None:
+    disp = apply_thresholds(
+        "src-1",
+        (_make_scored_match("CAN-A", 0.92, abbreviation_fired=True),),
+        conn,
+    )
+    assert disp.action == "AUTO_APPROVE"
 
 
 # ---------------------------------------------------------------------------

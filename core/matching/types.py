@@ -51,6 +51,12 @@ class SignalBreakdown:
     All five weighted signals are always present (even when zero) so
     debug output can compare a scorer pass to its weight profile.
     `fasttext_cosine` is 0.0 when the model file is absent.
+
+    `fasttext_available` distinguishes "cosine is genuinely 0.0" from
+    "no embedding could be computed" (model absent / OOV-empty input).
+    Stage 3 renormalizes the weight budget over available signals, so
+    this flag decides whether `fasttext_cosine`'s weight participates
+    in the sum-to-1.0 budget for the pair.
     """
 
     token_sort_ratio: float
@@ -61,6 +67,7 @@ class SignalBreakdown:
     alias_boost_fired: bool
     abbreviation_bonus_fired: bool
     fasttext_cosine: float = 0.0
+    fasttext_available: bool = False
     b_boosts: tuple[BoostEntry, ...] = ()
 
 
