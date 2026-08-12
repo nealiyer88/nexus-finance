@@ -1,0 +1,72 @@
+# ── TEMPLATE — not active where it sits ──────────────────────────────────────
+# To use it:  cp .claude/templates/github-workflow.example.yml \
+#                .github/workflows/rocket-gates.yml
+# then fill in the ONE marked TODO block below (runtime setup + dependency
+# install for your stack) and commit it.
+#
+# WHY IT LOOKS LIKE THIS: CI runs the *identical* .claude/gates.sh that rocket
+# and your pre-commit hooks run locally. It does not re-list your lint/test
+# commands. The moment CI has its own copy of "what quality means", the two
+# definitions drift and you get the worst failure mode there is — green locally,
+# red in CI, with nobody able to reproduce either. One definition, three callers.
+#
+# CONSEQUENCE: do NOT add gate steps to this file. Which gates exist, what they
+# run, and how strict they are is configured ONLY in rocket.config.sh
+# (LINT_CMD, TYPECHECK_CMD, TEST_CMD, COVERAGE_CMD/COVERAGE_MIN, SECRETS_CMD,
+# DEPAUDIT_CMD, EXERCISE_HOOK). Change gate behaviour there and it takes effect
+# locally and in CI at once. An unset command is SKIPPED, so this workflow is
+# safe to add before every gate is configured.
+# ─────────────────────────────────────────────────────────────────────────────
+name: gates
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Some gates (secrets scanners, diff-scoped linters) want history
+          # rather than a shallow clone. Drop this if yours do not.
+          fetch-depth: 0
+
+      # ── TODO: SET UP YOUR RUNTIME HERE ───────────────────────────────────
+      # The rocket core is stack-agnostic and cannot know what your gate
+      # commands need on PATH. Replace this block with the setup + dependency
+      # install for your project, e.g. actions/setup-python + pip install,
+      # actions/setup-node + npm ci, actions/setup-go, actions/setup-java,
+      # a docker build, or nothing at all if your gates are pure shell.
+      #
+      # Whatever you add must leave every command referenced by
+      # rocket.config.sh runnable — a gate whose command cannot execute is a
+      # FAIL ("nothing was verified"), not a skip.
+      - name: Set up runtime
+        run: |
+          echo "TODO: install this project's toolchain and dependencies here."
+          echo "Until this is filled in, gates that shell out to project tools will FAIL."
+      # ─────────────────────────────────────────────────────────────────────
+
+      # The whole point of the file. Scope `all` = every configured gate.
+      # $GITHUB_SHA is the slug, so the report and its per-gate logs are named
+      # after the exact commit under test.
+      # gates.sh exits 0 on VERDICT: PASS, 1 on FAIL, 2 on a usage error — all
+      # nonzero exits fail the job, which is the default `run` behaviour here.
+      - name: Run rocket gates
+        run: bash .claude/gates.sh all "$GITHUB_SHA" "gate-report-${GITHUB_SHA}.md"
+
+      # Uploaded even on failure — that is the entire reason it exists. Without
+      # the report plus the per-gate raw logs, a red CI run can only be
+      # diagnosed by pushing another commit and guessing.
+      - name: Upload gate report and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-report-${{ github.sha }}
+          path: |
+            gate-report-${{ github.sha }}.md
+            gate-report-${{ github.sha }}.md.gate-logs/
+          if-no-files-found: warn
+          retention-days: 14

@@ -61,3 +61,17 @@ tests/fixtures/_ground_truth.json
 models/*.bin
 models/*.gz
 models/*.bin.gz
+features/_logs/
+features/_reality/
+features/_agents/
+features/AGENT_OUTPUTS.jsonl
+.rocket/
+scripts/__pycache__/
+
+# Caches written by the checks rocket-loop configured for you.
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ruff_cache/
+.mypy_cache/

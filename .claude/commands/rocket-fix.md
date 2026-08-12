@@ -41,11 +41,11 @@ your commits off the loop's working branch. Just `git commit` where you are.
 3. For each BLOCKING issue, in order:
    - State the issue tag (e.g. `[QA-001]`) in your reasoning.
    - Make the minimal correct fix — do NOT expand scope beyond the build prompt.
-   - Run the project's test command after the fix (default `python -m pytest tests/ -x --tb=short`).
+   - Run the project's test command after the fix — EXACTLY `$ARGUMENTS.test_cmd`.
+     Do NOT substitute a generic equivalent; its absence is an ENVIRONMENT ERROR.
    - If a fix causes a regression (compare to `.claude/hooks/test-baseline.txt`), REVERT it.
 4. Refresh the test log:
-   `python -m pytest tests/ --tb=long --no-header | tee $ARGUMENTS.log_dir/$ARGUMENTS.slug-pytest.log`
-   (substitute your test runner if not pytest).
+   `$ARGUMENTS.test_cmd | tee $ARGUMENTS.log_dir/$ARGUMENTS.slug-pytest.log`
 5. Append a fix note to `$ARGUMENTS.log_dir/$ARGUMENTS.slug-fix-report.md` (which issues
    fixed, which deferred and why).
 6. Commit (scoped staging, never `git add -A`):

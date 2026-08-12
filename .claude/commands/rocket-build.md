@@ -49,10 +49,11 @@ commits strand off the loop's working branch (rocket pins them back, but don't r
 2. Read the build prompt at `$ARGUMENTS.build_prompt` and the brief at `$ARGUMENTS.feature_brief`.
 3. Build EXACTLY what the prompt specifies. Write tests for every public function.
    No protected-file modifications. No sensitive values in terminal output.
-4. Run the project's test command (the build prompt names it; default `python -m pytest tests/ -x --tb=short`) and fix the CODE until green.
+4. Run the project's test command — EXACTLY `$ARGUMENTS.test_cmd` — and fix the CODE until green.
+   Do NOT substitute a generic equivalent: it may not exist in this environment, and
+   its absence is an ENVIRONMENT ERROR, never evidence that the tests fail.
 5. Capture the raw test log (reviewers' source of truth):
-   `python -m pytest tests/ --tb=long --no-header | tee $ARGUMENTS.log_dir/$ARGUMENTS.slug-pytest.log`
-   (substitute your test runner if not pytest).
+   `$ARGUMENTS.test_cmd | tee $ARGUMENTS.log_dir/$ARGUMENTS.slug-pytest.log`
 6. Write a build manifest to `$ARGUMENTS.log_dir/$ARGUMENTS.slug-build-manifest.md`:
    files created (with line counts), files modified (diff summary), test pass count,
    and a short "what was built / what was deferred" note for the reviewers.

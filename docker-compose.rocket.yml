@@ -1,0 +1,30 @@
+# ── Run the Rocket Loop in a container against THIS project ───────────────────
+# Named docker-compose.rocket.yml so it never collides with your project's own compose.
+#
+#   1. Build the image once, from the rocket-loop repo:   docker build -t rocket-loop .
+#   2. From this project root:
+#        docker compose -f docker-compose.rocket.yml run --rm rocket
+#        docker compose -f docker-compose.rocket.yml run --rm rocket --max 5 --feature B4
+#
+# Auth — two ways, both supported (pick either or both):
+#   A) Mount host login dirs (default below): uses creds you already have on the host.
+#   B) Env keys: create a .env next to this file and uncomment env_file below
+#      (ANTHROPIC_API_KEY=... / OPENAI_API_KEY=... / GEMINI_API_KEY=... etc.).
+#
+# Notes:
+#  - Comment out any agent credential dir you don't use. On Windows set HOME (or
+#    replace ${HOME} with an absolute host path) so the mounts resolve.
+#  - Your project's OWN runtime deps go in a docker-compose.override.yml or a child
+#    image (FROM rocket-loop) — the base image only carries the loop's tooling.
+services:
+  rocket:
+    image: rocket-loop:latest
+    working_dir: /workspace
+    volumes:
+      - .:/workspace                       # this project + its installed loop files
+      - ${HOME}/.claude:/root/.claude       # Claude Code login (AGENT=claude)
+      - ${HOME}/.codex:/root/.codex         # Codex CLI (AGENT=codex)
+      - ${HOME}/.gemini:/root/.gemini       # Gemini CLI (AGENT=gemini)
+      - ${HOME}/.cursor:/root/.cursor       # Cursor CLI (AGENT=cursor)
+    # env_file:                            # (B) uncomment for key-based auth
+    #   - .env

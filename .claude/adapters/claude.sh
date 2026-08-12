@@ -5,16 +5,32 @@
 # Requires the `_python` helper from rocket.sh (sourced after it is defined).
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Tier policy: plan = adversaries, reconcile, reality-check, prompt-gen
+# (Opus class); build = builder, fixer, both reviewers (Sonnet);
+# narrate = live narration only (Haiku).
 agent_model_for_tier() {
   case "$1" in
-    plan)    echo "${MODEL_PLAN:-opus}" ;;
+    plan)    echo "${MODEL_PLAN:-claude-opus-5}" ;;
     narrate) echo "${MODEL_NARRATE:-claude-haiku-4-5-20251001}" ;;
-    *)       echo "${MODEL_BUILD:-sonnet}" ;;   # build (default)
+    *)       echo "${MODEL_BUILD:-claude-sonnet-5}" ;;   # build (default)
   esac
 }
 
-agent_build_cmd() {  # <tier> <mode> — prompt is piped via stdin by rocket.sh
-  local tier="$1" mode="$2" model; model="$(agent_model_for_tier "$tier")"
+# Fan-out roles on the BUILD tier (design §2): lead = Sonnet (judgment slices,
+# integration, fixer); worker = Haiku (provably-mechanical slices only).
+agent_model_for_role() {
+  case "$1" in
+    worker) echo "${MODEL_WORKER:-${MODEL_NARRATE:-claude-haiku-4-5-20251001}}" ;;
+    *)      echo "${MODEL_BUILD:-claude-sonnet-5}" ;;   # lead / unset (default)
+  esac
+}
+
+agent_build_cmd() {  # <tier> <mode> [role] — prompt piped via stdin by rocket.sh.
+  # Optional 3rd arg selects model by fan-out ROLE (lead/worker) instead of tier;
+  # worktree confinement is handled by the caller (cwd = the unit's worktree).
+  local tier="$1" mode="$2" role="${3:-}" model
+  if [ -n "$role" ]; then model="$(agent_model_for_role "$role")"
+  else model="$(agent_model_for_tier "$tier")"; fi
   local base="claude -p --model $model --output-format json"
   case "$mode" in
     write)    echo "$base --permission-mode bypassPermissions" ;;
@@ -46,5 +62,10 @@ PY
 }
 
 agent_narrate() {  # <prompt> — short plain-text summary, best-effort
-  claude -p "$1" --model "$(agent_model_for_tier narrate)" --output-format text 2>/dev/null || true
+  # Tool-less + capped: the narrator summarizes instruction-shaped artifacts (build
+  # prompts). A Read-only allowlist (no bypass) means it cannot write or run Bash even
+  # if it tries to EXECUTE the artifact, and the hard budget cap kills a runaway in
+  # seconds. Pairs with the DATA-not-instructions framing rocket.sh puts in the prompt.
+  claude -p "$1" --model "$(agent_model_for_tier narrate)" --output-format text \
+    --allowedTools "Read" --max-budget-usd 0.25 2>/dev/null || true
 }
