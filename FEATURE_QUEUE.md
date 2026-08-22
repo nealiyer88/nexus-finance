@@ -29,13 +29,14 @@
 | 8a | fasttext-signal-retrofit | features/pipeline/fasttext-signal-retrofit.md | 7, 8 | SHIPPED | v4 §5,9,17 |
 | 8b | b3-transactions-table-and-amount-signal | features/pipeline/b3-transactions-table-and-amount-signal.md | 8a | QUEUED | v4 §9 B3 |
 | 9 | threshold-llm-fallback | features/pipeline/threshold-llm-fallback.md | 8 | SHIPPED | v3 (unaffected by v4) |
-| 10 | resolution-graph-update | features/pipeline/resolution-graph-update.md | 9 | QUEUED | v4 |
+| 10 | resolution-graph-update | features/pipeline/resolution-graph-update.md | 9 | QUEUED | v4 §9 |
+| 10a | postgres-store-bootstrap | features/infrastructure/postgres-store-bootstrap.md | 2, 10 | QUEUED | v4 §8,10 |
 | 11 | approval-queue | features/dashboard/approval-queue.md | 9, 10 | QUEUED | v4 |
 | 12 | matcher-orchestrator | features/pipeline/matcher-orchestrator.md | 7, 8, 8a, 8b, 9, 10 | QUEUED | v4 §7 |
 | 13 | historical-cold-start | features/data/historical-cold-start.md | 11, 12 | QUEUED | v4 |
 | 14 | overview-entity-browser | features/dashboard/overview-entity-browser.md | 10, 11 | QUEUED | v4 |
 | 15 | ar-reconciliation | features/dashboard/ar-reconciliation.md | 12, 14 | QUEUED | v4 |
-| 16 | connectors-audit-infra | features/infrastructure/connectors-audit-infra.md | 5, 6, 10 | QUEUED | v4 |
+| 16 | connectors-audit-infra | features/infrastructure/connectors-audit-infra.md | 5, 6, 10a | QUEUED | v4 |
 | 17 | signup-onboarding | features/infrastructure/signup-onboarding.md | 1, 2, 3, 4, 5, 6, 7, 8, 8a, 9, 10, 11, 12, 13, 14, 15, 16 | QUEUED | v4 |
 
 > **v4 retrofit note (2026-06-20):** Product spec v4 made pre-trained fastText
