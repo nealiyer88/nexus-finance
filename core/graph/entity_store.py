@@ -1,9 +1,11 @@
-"""Read-only interface to the SQLite graph store for matcher Stages 1–2.
+"""Read/write interface to the SQLite graph store for matcher Stages 1–2 and 6.
 
 Exposes deterministic-match anchor lookups (alias_exact, email, employee_id),
 plus a small helper for the Stage 2d intra-system filter. All functions are
-module-level — no class wrapper, no shared state, no write path. Stage 6
-(resolution / graph update) will add write functions to this same module.
+module-level — no class wrapper, no shared state. Stage 6 (resolution /
+graph update) write functions are appended below the Stage 1–4 read
+functions; none of them call `conn.commit()` or `conn.rollback()` — the
+transaction boundary is owned exclusively by `core.graph.resolution`.
 
 Tenant scoping: every read takes `tenant_id: Optional[str] = None`. When
 `None`, no WHERE filter is applied (V1 single-tenant SQLite default —
@@ -21,8 +23,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 
 def lookup_alias_exact(
@@ -638,3 +641,242 @@ def are_clustered(
             (tenant_id, tenant_id, cid_a, cid_b, cid_b, cid_a),
         ).fetchone()
     return row is not None
+
+
+# ---------------------------------------------------------------------------
+# Stage 6 writes (resolution / graph update)
+# ---------------------------------------------------------------------------
+#
+# None of the functions below call `conn.commit()` or `conn.rollback()` —
+# the transaction boundary belongs exclusively to `core.graph.resolution`.
+# `tenant_id` is a real column on `canonical_entities` only; on
+# `entity_aliases` / `entity_edges` / `system_references` (which carry no
+# `tenant_id` column) it is a scoping filter applied by verifying the
+# parent `canonical_entities` row is in tenant scope before writing —
+# never an inserted value.
+
+
+def _assert_tenant_scope(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    tenant_id: Optional[str],
+) -> None:
+    """Raise ValueError if `canonical_id` is not visible under `tenant_id`.
+
+    No-op when `tenant_id` is None (V1 single-tenant default).
+    """
+    if tenant_id is None:
+        return
+    row = conn.execute(
+        "SELECT 1 FROM canonical_entities WHERE canonical_id = ? AND tenant_id = ?",
+        (canonical_id, tenant_id),
+    ).fetchone()
+    if row is None:
+        raise ValueError(
+            f"canonical_id {canonical_id!r} not visible under tenant_id {tenant_id!r}"
+        )
+
+
+def create_canonical_entity(
+    conn: sqlite3.Connection,
+    canonical_name: str,
+    entity_type: str,
+    entity_category: str,
+    confidence: float,
+    tenant_id: Optional[str] = None,
+) -> str:
+    """Insert a new `canonical_entities` row and return its generated id.
+
+    `canonical_id` is generated as `f"{entity_type.upper()}_{hex8}"`
+    (rules §3 shape, e.g. `CLIENT_0042`), never caller-supplied — Stage 6
+    is the only writer that mints canonical ids. `tenant_id` is written
+    as a real column value (nullable).
+    """
+    canonical_id = f"{entity_type.upper()}_{uuid.uuid4().hex[:8].upper()}"
+    conn.execute(
+        """
+        INSERT INTO canonical_entities (
+            canonical_id, tenant_id, canonical_name, entity_type, entity_category, confidence
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (canonical_id, tenant_id, canonical_name, entity_type, entity_category, confidence),
+    )
+    return canonical_id
+
+
+def add_alias(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    value: str,
+    source: str,
+    category: str,
+    confidence: float,
+    tenant_id: Optional[str] = None,
+) -> int:
+    """Idempotently add an `entity_aliases` row and return its `alias_id`.
+
+    Relies on the shipped `UNIQUE (canonical_id, value, source)`
+    constraint: `INSERT ... ON CONFLICT DO NOTHING`, then a SELECT to
+    return the (new or pre-existing) `alias_id`. `tenant_id` is a
+    scoping filter only — `entity_aliases` has no `tenant_id` column.
+    """
+    _assert_tenant_scope(conn, canonical_id, tenant_id)
+    conn.execute(
+        """
+        INSERT INTO entity_aliases (canonical_id, value, source, category, confidence)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT (canonical_id, value, source) DO NOTHING
+        """,
+        (canonical_id, value, source, category, confidence),
+    )
+    row = conn.execute(
+        """
+        SELECT alias_id FROM entity_aliases
+         WHERE canonical_id = ? AND value = ? AND source = ?
+        """,
+        (canonical_id, value, source),
+    ).fetchone()
+    return int(row[0])
+
+
+def add_system_reference(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    source: str,
+    category: str,
+    external_id: str,
+    external_fields: Optional[dict[str, Any]],
+    tenant_id: Optional[str] = None,
+) -> int:
+    """Idempotently upsert a `system_references` row on `(source,
+    external_id)` and return its `ref_id`.
+
+    `UNIQUE (source, external_id)` is GLOBAL, not per-canonical. When an
+    existing row for that key already belongs to `canonical_id`, it is
+    updated in place (idempotent re-write). When it belongs to a
+    DIFFERENT canonical, the write is refused — an unguarded upsert
+    would silently re-point a source-system reference across
+    canonicals. `tenant_id` is a scoping filter only — `system_references`
+    has no `tenant_id` column.
+    """
+    _assert_tenant_scope(conn, canonical_id, tenant_id)
+    fields_json = json.dumps(external_fields, sort_keys=True) if external_fields else None
+
+    existing = conn.execute(
+        "SELECT ref_id, canonical_id FROM system_references WHERE source = ? AND external_id = ?",
+        (source, external_id),
+    ).fetchone()
+    if existing is not None:
+        existing_ref_id, existing_canonical_id = existing
+        if existing_canonical_id != canonical_id:
+            raise ValueError(
+                f"system_reference (source={source!r}, external_id={external_id!r}) "
+                f"already bound to canonical_id {existing_canonical_id!r}; "
+                f"refusing to re-point it to {canonical_id!r}"
+            )
+        conn.execute(
+            "UPDATE system_references SET category = ?, external_fields = ? WHERE ref_id = ?",
+            (category, fields_json, existing_ref_id),
+        )
+        return int(existing_ref_id)
+
+    cur = conn.execute(
+        """
+        INSERT INTO system_references (canonical_id, source, category, external_id, external_fields)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (canonical_id, source, category, external_id, fields_json),
+    )
+    return int(cur.lastrowid)
+
+
+def upsert_edge(
+    conn: sqlite3.Connection,
+    source_node: str,
+    target_node: str,
+    relationship: str,
+    source_category: str,
+    target_category: str,
+    weight: float,
+    approved_by: str,
+    tenant_id: Optional[str] = None,
+) -> int:
+    """Idempotently create-or-reconfirm an `entity_edges` row.
+
+    `entity_edges` carries NO uniqueness constraint, so idempotency is a
+    hand-written SELECT-then-branch on `(source_node, target_node,
+    relationship)`: when a row already exists, delegate to
+    `increment_approval_count` instead of inserting a second edge (no
+    duplicate-edge row is ever created). Otherwise insert a fresh row
+    with `approval_count = 1`. Returns the `edge_id` in either case.
+    `tenant_id` scopes BOTH endpoints — `entity_edges` has no
+    `tenant_id` column.
+    """
+    _assert_tenant_scope(conn, source_node, tenant_id)
+    _assert_tenant_scope(conn, target_node, tenant_id)
+
+    existing = conn.execute(
+        """
+        SELECT edge_id FROM entity_edges
+         WHERE source_node = ? AND target_node = ? AND relationship = ?
+        """,
+        (source_node, target_node, relationship),
+    ).fetchone()
+    if existing is not None:
+        edge_id = int(existing[0])
+        increment_approval_count(conn, edge_id)
+        return edge_id
+
+    cur = conn.execute(
+        """
+        INSERT INTO entity_edges (
+            source_node, target_node, relationship,
+            source_category, target_category, weight, approved_by, approval_count
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        """,
+        (source_node, target_node, relationship, source_category, target_category, weight, approved_by),
+    )
+    return int(cur.lastrowid)
+
+
+def increment_approval_count(conn: sqlite3.Connection, edge_id: int) -> int:
+    """Increment `entity_edges.approval_count` by 1 and return the new value."""
+    conn.execute(
+        "UPDATE entity_edges SET approval_count = approval_count + 1 WHERE edge_id = ?",
+        (edge_id,),
+    )
+    row = conn.execute(
+        "SELECT approval_count FROM entity_edges WHERE edge_id = ?",
+        (edge_id,),
+    ).fetchone()
+    return int(row[0]) if row else 0
+
+
+def update_confidence(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    new_confidence: float,
+    tenant_id: Optional[str] = None,
+) -> None:
+    """Update `canonical_entities.confidence` (and `updated_at`) for
+    `canonical_id`. When `tenant_id` is set, scopes the WHERE clause to
+    that tenant — a mismatched tenant leaves the row untouched.
+    """
+    if tenant_id is None:
+        conn.execute(
+            """
+            UPDATE canonical_entities
+               SET confidence = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE canonical_id = ?
+            """,
+            (new_confidence, canonical_id),
+        )
+    else:
+        conn.execute(
+            """
+            UPDATE canonical_entities
+               SET confidence = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE canonical_id = ? AND tenant_id = ?
+            """,
+            (new_confidence, canonical_id, tenant_id),
+        )
