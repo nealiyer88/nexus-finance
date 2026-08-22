@@ -33,13 +33,18 @@ Two defects found in the 2026-08-22 reality-check dry run of the combined brief 
   - `is_available() -> bool` — used by test skip guards.
   - No pooling, no ORM, no engine abstraction.
 
-- **Migration runner — `scripts/migrate_pg.py`.** Applies SQL files from `db/migrations/` in filename order against the configured database, recording each applied filename.
+- **Migration runner — `scripts/migrate_pg.py`.** Applies Postgres migrations against the configured database, recording each applied filename.
+
+  **SELECTION RULE (the one mechanism; no other rule applies anywhere in this brief):** *The runner applies exactly the filenames listed in `db/migrations/postgres.manifest`, in the order they appear in that file, and never reads or applies any other file in `db/migrations/`.* The manifest (NEW, created by this feature) is a newline-delimited list of bare filenames; blank lines and `#` comment lines are ignored. Verified 2026-08-22, `db/migrations/` contains exactly three files — `001_canonical_schema.sql`, `002_llm_training_data.sql`, `002_llm_training_data_sqlite.sql` — so the manifest ships as, in order: `001_canonical_schema.sql`, `002_llm_training_data.sql`, `003_bootstrap_tenant.sql` (the last created by this feature, below). `002_llm_training_data_sqlite.sql` is **not listed and is therefore never applied to Postgres**; it is the SQLite mirror feature 9 shipped and is loaded only by SQLite tests. If the manifest names a file that does not exist on disk, the runner exits non-zero before applying anything.
+
+  **Why a manifest rather than a naming convention or a directory split:** it is fail-closed and opt-in — a migration file added later is invisible to Postgres until someone lists it, so a future SQLite-only or dialect-ambiguous file can never be applied by accident no matter how it is named, and the worst failure mode is a migration that visibly did not run rather than a wrong-dialect one that did. (A directory split was rejected because `tests/test_schema_parity.py` parses `db/migrations/001_canonical_schema.sql` at its current path.)
+
   - Creates `schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())` **before** applying anything.
   - **Skips any file already recorded.** A file is applied at most once, ever.
   - **DESTRUCTIVE-FILE GUARD (defect fix — see below).** Before applying `001_canonical_schema.sql`, the runner checks whether `canonical_entities` already exists while `schema_migrations` has no row for `001`. If so it **refuses to run**, exits non-zero, and prints the reason. This is the case where a database was created some other way and re-running 001 would silently destroy it.
   - Prints one line per file (`applied` / `skipped`) and exits 0 on success.
   - `--dry-run` prints the plan and applies nothing.
-  - `db/migrations/002_llm_training_data.sql` (the Postgres sibling of the SQLite mirror feature 9 shipped) is applied by the same runner in filename order.
+  - `db/migrations/002_llm_training_data.sql` (the Postgres sibling of the SQLite mirror feature 9 shipped) is applied by the same runner because it is listed in the manifest; its `_sqlite` sibling is not listed and is not applied.
 
   **DEFECT FIX — "idempotent on second run" was false and is not repeated here.** `db/migrations/001_canonical_schema.sql:9-18` opens, inside a single `BEGIN`, with eight statements: `DROP TABLE IF EXISTS approvals / entities / approval_decisions / system_references / entity_edges / entity_aliases / canonical_entities / audit_log CASCADE`. Its own comment calls this "idempotent migration"; it is not — re-executing 001 **drops eight tables and every row in them**. Only the `CREATE TABLE` half is `IF NOT EXISTS`-guarded; the `DROP` half is unconditional.
 
@@ -57,7 +62,13 @@ Two defects found in the 2026-08-22 reality-check dry run of the combined brief 
       integration: requires a live Postgres reachable via DATABASE_URL
   ```
 
-  `--strict-markers` turns any future unregistered marker into a collection **error** rather than a warning. Adding a `pytest.ini` fixes pytest's rootdir at the repo root, which is also where `sys.path` insertion for `from core...` imports comes from — the full existing suite must be re-verified under the new config (criterion below).
+  `--strict-markers` turns any future unregistered marker into a collection **error** rather than a warning. Adding a `pytest.ini` fixes pytest's rootdir at the repo root and sets `testpaths`/`addopts` for every future run. Note that rootdir is *not* what puts the repo root on `sys.path` — that comes from invoking `.venv/bin/python -m pytest`, which prepends the current working directory, so `from core...` imports keep working for the same reason they do today. The config still changes collection (rootdir, `testpaths`, `addopts`), so the full existing suite must be re-verified under it (criterion below).
+
+- **Tenant provisioning — owned here, relied on downstream.** Verified 2026-08-22: `tenants` is `(id UUID PK DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, created_at TIMESTAMPTZ NOT NULL DEFAULT now())` (`db/schema.sql:6-11`, `001:20-25`), and five columns reference it `NOT NULL` — `connectors.tenant_id` (`db/schema.sql:16`), `system_references`, `entity_edges`, `approval_decisions` (`:88`), `audit_log` (`:108`). Nothing anywhere creates a `tenants` row today, so the first real insert on any of those tables FK-fails. This feature closes that:
+  - `core/graph/pg.py` exposes `BOOTSTRAP_TENANT_ID` — a **fixed UUID literal**, not generated, so it is stable across databases and quotable by other features.
+  - `db/migrations/003_bootstrap_tenant.sql` (NEW, listed last in the manifest) inserts that row: `INSERT INTO tenants (id, name, slug) VALUES ('<BOOTSTRAP_TENANT_ID>', 'Bootstrap Tenant', 'bootstrap') ON CONFLICT (id) DO NOTHING;` — re-running applies nothing and destroys nothing. `tenants` is never dropped by 001 (`001:19-25` preserves it), so this seed survives the destructive block.
+  - `core/graph/tenants.py` — `resolve_or_create_tenant(conn, tenant_id, name=None, slug=None) -> UUID`, an `INSERT ... ON CONFLICT (id) DO NOTHING` + `SELECT`. Every writer in this feature calls it before inserting, so a tenant id that is not the bootstrap one still works.
+  - **Downstream contract:** feature 16's `DEFAULT_TENANT_ID` constant **must be the same literal as `BOOTSTRAP_TENANT_ID`**, and feature 16 may assume the row exists after `migrate_pg.py` has run. Feature 16 does not create tenants.
 
 - **`tests/conftest.py` (NEW):** a `pg_conn` fixture that `pytest.skip`s with an explicit reason when `core.graph.pg.is_available()` is `False`, yields a connection wrapped in a transaction, and rolls back at teardown so integration tests leave no residue.
 
@@ -107,11 +118,21 @@ Two defects found in the 2026-08-22 reality-check dry run of the combined brief 
 **Migration runner (requires a database):**
 
 - [ ] Against an empty database, `DATABASE_URL=... .venv/bin/python scripts/migrate_pg.py` exits 0, and `SELECT to_regclass('public.approval_decisions')` and `SELECT to_regclass('public.audit_log')` both return non-NULL.
-- [ ] `SELECT filename FROM schema_migrations ORDER BY filename` returns exactly the files under `db/migrations/` that target Postgres, in filename order.
+- [ ] `SELECT filename FROM schema_migrations ORDER BY applied_at` returns exactly, in this order: `001_canonical_schema.sql`, `002_llm_training_data.sql`, `003_bootstrap_tenant.sql` — i.e. exactly the manifest, in manifest order, and nothing else.
+- [ ] **SQLite migration is provably not applied:** after a full run, `SELECT COUNT(*) FROM schema_migrations WHERE filename LIKE '%\_sqlite%'` returns **0**, `SELECT COUNT(*) FROM schema_migrations` returns **3**, and the runner's stdout contains **no** line mentioning `002_llm_training_data_sqlite.sql` (neither `applied` nor `skipped` — the file is never read at all). Grep-assert `db/migrations/postgres.manifest` contains no `_sqlite` entry.
+- [ ] **Fail-closed on an unlisted file:** a test drops a syntactically-invalid `.sql` file into `db/migrations/` without listing it in the manifest; the runner still exits 0 and `schema_migrations` still holds exactly the 3 manifest rows — proving selection is by manifest, not by directory scan.
+- [ ] **Fail-closed on a missing file:** with a manifest entry naming a nonexistent file, the runner exits **non-zero**, names the missing filename, and applies nothing.
 - [ ] **Runner-level idempotency (the only idempotency claimed):** a second immediate run exits 0, prints `skipped` for every file, prints `applied` for none, and leaves both `SELECT COUNT(*) FROM schema_migrations` and a pre-seeded `SELECT COUNT(*) FROM canonical_entities` **unchanged**. Explicitly asserted: seed one `canonical_entities` row before the second run and assert it still exists afterward.
 - [ ] **Destructive-file guard:** on a database where `canonical_entities` exists but `schema_migrations` has no row for `001_canonical_schema.sql`, the runner exits **non-zero**, prints a message containing `001_canonical_schema.sql`, and applies nothing (`canonical_entities` row count unchanged).
 - [ ] `scripts/migrate_pg.py --dry-run` exits 0 and creates no table (`SELECT to_regclass('public.audit_log')` still NULL on an empty database).
 - [ ] `scripts/migrate_pg.py`'s module docstring contains the literal words `DROP TABLE` and `data loss` — grep-asserted, so the hazard cannot be silently deleted.
+
+**Tenant provisioning (requires a database):**
+
+- [ ] After `migrate_pg.py` completes on an empty database, `SELECT COUNT(*) FROM tenants WHERE id = '<BOOTSTRAP_TENANT_ID>'` returns **1**, and that literal is byte-identical to `core.graph.pg.BOOTSTRAP_TENANT_ID` (asserted in the test, not eyeballed).
+- [ ] **A dependent insert referencing it succeeds:** `INSERT INTO audit_log (tenant_id, action, resource) VALUES (core.graph.pg.BOOTSTRAP_TENANT_ID, 'test', 'test')` commits without an FK error, and `INSERT` of the same row shape with a random unseeded UUID raises a `ForeignKeyViolation` — proving the FK is live and the seed is what satisfies it.
+- [ ] `resolve_or_create_tenant(conn, <fresh UUID>)` returns that UUID, creates exactly one `tenants` row, and a second call with the same UUID creates none and returns the same value.
+- [ ] A no-database test asserts `core.graph.pg.BOOTSTRAP_TENANT_ID` parses as a valid UUID and is a module-level literal (no `uuid4()` call in `core/graph/pg.py` — grep-asserted), so feature 16's `DEFAULT_TENANT_ID` can quote it.
 
 **Writers:**
 
@@ -130,7 +151,7 @@ Two defects found in the 2026-08-22 reality-check dry run of the combined brief 
 - [ ] **Feature 10 (resolution-graph-update) — must land first.** It ships `core/graph/resolution.py`, the call site for `log_resolution` and `record_approval_decision`, and the decision payloads they persist. Feature 10 has no reverse dependency on this feature and is fully buildable and testable with no Postgres present.
 - [ ] **A reachable Postgres 16 instance** for the integration tier — local Docker or a CI service container. Absent one, the integration criteria are **not verified**; they skip. A skip is not a pass, and this feature cannot be marked SHIPPED on skips alone.
 - [ ] **`python-dotenv`** — already pinned in `requirements.txt`; no new pin needed for config loading.
-- **Downstream:** feature 16 (`connectors-audit-infra`) currently names feature 10 as the owner of the Postgres path. That is now this feature — feature 16's dependency and queue row must point at **10a**.
+- **Downstream:** feature 16 (`connectors-audit-infra`) currently names feature 10 as the owner of the Postgres path. That is now this feature — feature 16's dependency and queue row must point at **10a**. Feature 16 also inherits tenant provisioning from here: its `DEFAULT_TENANT_ID` must be set to this feature's `BOOTSTRAP_TENANT_ID` literal, and it must not create `tenants` rows of its own.
 
 ---
 
@@ -164,7 +185,7 @@ Stage 6 Resolution (feature 10, SQLite)
 2. **Every test command is `.venv/bin/python -m pytest ...`.** Bare `pytest` is not on PATH, and `.venv/bin/pytest` does not put the repo root on `sys.path`, so every `from core...` import fails to collect.
 3. **`@pytest.mark.integration` is worthless without registration.** Before this feature there is no pytest config at all, so `-m integration` selects nothing and pytest exits 5. Any criterion that "passes" by selecting zero tests is false signal — that is why the criteria above assert a **collected count** and an exit code, not just "the suite passes".
 4. **Never claim migration 001 is idempotent.** It is not: `001:9-18` drops eight tables `CASCADE` inside a `BEGIN`. Idempotency in this feature means *the runner does not re-run an applied file*. Keep that wording in code comments, help text, and any future brief that inherits this.
-5. **`tenant_id` mismatch between engines.** `approval_decisions.tenant_id` and `audit_log.tenant_id` are `NOT NULL REFERENCES tenants(id)` (`db/schema.sql:88`, `:108`), while the SQLite convention is nullable and fixtures load NULL (`schema_sqlite.sql:8`, `entity_store.py:12-16`). The writers must resolve or create a `tenants` row for the active tenant before insert, or the NOT NULL FK rejects every write. Test this explicitly — it is the most likely first-run failure.
+5. **`tenant_id` mismatch between engines.** `approval_decisions.tenant_id` and `audit_log.tenant_id` are `NOT NULL REFERENCES tenants(id)` (`db/schema.sql:88`, `:108`), while the SQLite convention is nullable and fixtures load NULL (`schema_sqlite.sql:8`, `entity_store.py:12-16`). The writers must call `resolve_or_create_tenant()` before insert, or the NOT NULL FK rejects every write. `003_bootstrap_tenant.sql` seeds `BOOTSTRAP_TENANT_ID` so the default path already has a valid row. Test this explicitly — it is the most likely first-run failure, and feature 16 depends on the seeded row existing.
 6. **Write Postgres before SQLite.** The ordering is the mitigation, not an implementation detail; do not reorder for convenience.
 7. **`--strict-markers` is deliberate.** It converts the class of bug this feature exists to fix into a hard error for everyone after.
 

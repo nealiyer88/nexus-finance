@@ -76,7 +76,10 @@ This feature is scoped to the **SQLite store that every runtime and test path in
 - Write-back to source systems — Shadow Ledger only.
 - Batch resolution (1000 entities at once) — V1 processes sequentially.
 - Adding `approved_at` to `entity_edges`, or any change to `db/schema.sql` / `db/schema_sqlite.sql` / migration 001. No new migration file.
-- Row-level security. No `CREATE POLICY` exists anywhere and zero queries filter on `tenant_id`; new writes carry `tenant_id` as a **column value only**.
+- Row-level security. No `CREATE POLICY` exists anywhere and no query filters on `tenant_id` unless the caller passes one. **`tenant_id` is a column on exactly one table.** Per-table reality, taken from the shipped DDL:
+  - `canonical_entities` **has** a `tenant_id` column (`schema_sqlite.sql:8`, nullable). `create_canonical_entity` writes it as a column value; `update_confidence` scopes with `WHERE canonical_id = ? AND tenant_id = ?` when a tenant is passed.
+  - `entity_aliases`, `entity_edges`, and `system_references` have **no `tenant_id` column** (`schema_sqlite.sql:20-29`, `:32-44`, `:48-57`). Their `tenant_id=` parameter is a **scoping filter, never an inserted value**: it is applied by joining to the parent `canonical_entities` row, exactly as the shipped reads do — `entity_store.py:11-12` ("alias and system_reference tables join through `canonical_id`"), `get_aliases` (`:265-276`) joins `canonical_entities AS c` and filters `c.tenant_id = ?`, and `are_clustered` (`:530-555`) requires **both** edge endpoints to match the tenant.
+  - Therefore `add_alias`, `upsert_edge`, and `add_system_reference` must **never** put `tenant_id` in an INSERT column list — `INSERT ... tenant_id` on those three tables raises `no such column: tenant_id`. They either ignore the parameter or use it to verify the parent canonical is in tenant scope before writing.
 - Migrating the SQLite graph store to Postgres.
 
 ---
@@ -86,7 +89,7 @@ This feature is scoped to the **SQLite store that every runtime and test path in
 Every criterion below runs with **no `DATABASE_URL` set and no Postgres installed**.
 
 - [ ] `core/graph/resolution.py` exists and `from core.graph.resolution import resolve_match, create_new_entity, reject_match` succeeds.
-- [ ] **Read-signature preservation:** a test snapshots `inspect.signature()` for every public function in `core/graph/entity_store.py` that existed at commit-before-this-feature (13 module-level defs as of 2026-08-22) and asserts each is present with an identical string repr. Any rename, reorder, or default change fails the test.
+- [ ] **Read-signature preservation:** a test snapshots `inspect.signature()` for every **public** function in `core/graph/entity_store.py` that existed at commit-before-this-feature — **12 public functions**, out of 13 module-level `def`s as of 2026-08-22 (the 13th, `_neighbors` at `entity_store.py:312`, is private and is excluded from the snapshot) — and asserts each is present with an identical string repr. Any rename, reorder, or default change fails the test.
 - [ ] `.venv/bin/python -m pytest tests/test_deterministic.py tests/test_blocking.py tests/test_scoring.py tests/test_disposition.py -x --tb=short` passes unchanged (exit 0).
 - [ ] After `resolve_match` on a confirmed match: exactly one new `entity_aliases` row exists for `(canonical_id, value, source)`; `entity_edges` has exactly one row for `(source_node, target_node, relationship)` with `source_category`, `target_category`, `weight`, and `approved_by` all non-NULL and equal to the values passed in.
 - [ ] **Alias idempotency:** calling `resolve_match` twice with identical input yields `SELECT COUNT(*) FROM entity_aliases` unchanged after the second call, and the same `canonical_id` returned both times.
@@ -94,6 +97,7 @@ Every criterion below runs with **no `DATABASE_URL` set and no Postgres installe
 - [ ] **Transaction atomicity:** a test injects an exception after the alias insert and before the edge insert; after the rollback, `SELECT COUNT(*)` on both `entity_aliases` and `entity_edges` equals the pre-call value.
 - [ ] After `create_new_entity`: a `canonical_entities` row exists with a generated non-empty `canonical_id`, `entity_type` and `entity_category` passing the schema CHECK constraints, and one `system_references` row per supplied source.
 - [ ] **Index-rebuild visibility:** after `resolve_match` adds alias `"pacrim tech"` to `CLIENT_XXXX`, rebuilding `TokenIndex` from the same connection and querying `"pacrim tech"` returns `CLIENT_XXXX`. (Asserts the write is visible to a rebuild; incremental index mutation is out of scope.)
+- [ ] **Index staleness signal:** `from core.graph.resolution import mark_indices_stale` succeeds and `mark_indices_stale()` returns `True` after a `resolve_match` or `create_new_entity` call that mutated the graph, and `False` after a `reject_match` (which performs no graph mutation) with no preceding mutation in the same test. Asserted directly in `tests/test_resolution.py`.
 - [ ] `core/matching/training_data.py` exposes `TrainingPair` with exactly the fields `entity_pair`, `signal_breakdown`, `graph_evidence`, `category_pair`, `disposition`, `reasoning_trace` — asserted via `dataclasses.fields()`.
 - [ ] `store_training_pair` inserts one `llm_training_data` row whose `call_id` starts with `resolution:`, whose `category_pair` matches `^[a-z_]+:[a-z_]+$`, and whose `llm_response_json` round-trips through `json.loads` to a dict containing all six `TrainingPair` fields.
 - [ ] A rejected match produces a `llm_training_data` row with `disposition == "REJECTED"` inside `llm_response_json` and a non-empty `signal_breakdown`.
@@ -120,7 +124,7 @@ Every criterion below runs with **no `DATABASE_URL` set and no Postgres installe
 
 **Rating:** M
 
-**Rationale:** Six write functions added to a 557-line module that is read-only by convention, one new orchestration module, one new dataclass module, and one test file — all against tables that already exist in the engine every code path already uses. The load-bearing risks are (a) not disturbing the 13 shipped read signatures, and (b) getting idempotency right where the schema does *not* help: `entity_aliases` and `system_references` carry UNIQUE constraints, but `entity_edges` does not, so duplicate-edge prevention is a hand-written SELECT-then-branch inside the transaction. Rated M rather than L precisely because the Postgres path, the driver pin, the migration runner, the integration tier, and the split-store transaction problem were all removed to feature 10a — this feature touches one engine and one transaction.
+**Rationale:** Six write functions added to a 557-line module that is read-only by convention, one new orchestration module, one new dataclass module, and one test file — all against tables that already exist in the engine every code path already uses. The load-bearing risks are (a) not disturbing the 12 shipped public read signatures (13 module-level defs, one of them the private `_neighbors`), and (b) getting idempotency right where the schema does *not* help: `entity_aliases` and `system_references` carry UNIQUE constraints, but `entity_edges` does not, so duplicate-edge prevention is a hand-written SELECT-then-branch inside the transaction. Rated M rather than L precisely because the Postgres path, the driver pin, the migration runner, the integration tier, and the split-store transaction problem were all removed to feature 10a — this feature touches one engine and one transaction.
 
 ---
 
@@ -166,7 +170,7 @@ Stage 6 Resolution (THIS FEATURE, SQLite):
 - `[BUILT]` `llm_training_data` — the only real SQLite training table; the write target for training capture.
 - `[BUILT]` LLM redaction (`core/matching/redaction.py`) — reused before persisting any pair text.
 - `[PLANNED → feature 10a]` Postgres, `approval_decisions`, `audit_log`, `DATABASE_URL`, any driver. Per §0, treat as **not existing**. This feature must not reference them.
-- `[PLANNED]` RLS. No `CREATE POLICY` anywhere; zero queries filter on `tenant_id`. New writes carry `tenant_id` as a value only.
+- `[PLANNED]` RLS. No `CREATE POLICY` anywhere. `tenant_id` is a column on `canonical_entities` only; on `entity_aliases` / `entity_edges` / `system_references` it is a join-through-parent filter, never an inserted column (see Out of Scope).
 - `[BUILT]` Training data capture from Day 1 — load-bearing for V2+ fine-tuning.
 
 ### Relevant Spec Sections
