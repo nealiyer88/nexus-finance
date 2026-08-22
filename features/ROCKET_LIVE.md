@@ -89,3 +89,12 @@ This implementation adds a new matching signal that recognizes when two entities
 ### 2026-08-22T13:53:51 · 8B · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
 
 ### 2026-08-22T13:53:53 · 8B · 🚦 full gates PASS — clear to ship
+
+### 2026-08-22T13:53:53 · 8B · ✅ SHIPPED — both reviews PASS, queue flipped, committed (~$4.3696 spent).
+
+### 2026-08-22T13:53:53 · 10 · 🚀 Starting 10 (resolution-graph-update.md)
+
+### 2026-08-22T13:53:53 · 10 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-22T13:56:17 · 10 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The reality check flagged two issues: the brief has outdated counts for one key module (feature 8b added a function it didn't account for), and it describes using the redaction system in a way that doesn't match its actual design. The flag means the brief needs revision before building can proceed.
