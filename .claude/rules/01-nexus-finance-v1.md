@@ -8,14 +8,14 @@ Architectural guardrails for V1 Claude Code sessions. This file is loaded every 
 - `[BUILT]` SQLite is the ONLY real engine in V1 — every runtime and test path uses `sqlite3`.
 - `[PLANNED]` `db/schema.sql` and `db/migrations/001` (Postgres/Supabase) are ASPIRATIONAL: no code imports psycopg or reads them; only `tests/test_schema_parity.py` parses `schema.sql` as text.
 - `[PLANNED]` Tables `approval_decisions` and `audit_log` exist in the Postgres schema ONLY — never created or queried at runtime.
-- `[BUILT]` `db/schema_sqlite.sql` has exactly 4 tables: `canonical_entities`, `entity_aliases`, `entity_edges`, `system_references`. The only other real SQLite table is `llm_training_data`.
+- `[BUILT]` `db/schema_sqlite.sql` is the ONLY schema that is actually created at runtime. Its stable core is the four graph tables `canonical_entities`, `entity_aliases`, `entity_edges`, `system_references`; features may append their own tables beside them (e.g. `transactions`, backing Signal B3). `llm_training_data` arrives via `db/migrations/002_*_sqlite.sql`. Grep the DDL for the current table list — never assume a fixed count.
 - `[PLANNED]` There is NO auth: `supabase==2.9.0` is pinned but never imported; `api/routers/auth.py`, `api/middleware/tenant.py`, `api/middleware/audit.py` are stubs; `api/main.py` exposes only `/health`.
 
 ## 1. V1 SCOPE
 
 - Connectors: QuickBooks Online (category: accounting) + RUDDR (category: psa). No others.
 - Write path: Shadow Ledger preview only. No live write-back to source systems.
-- Matching stack: RapidFuzz (token_set_ratio, partial_ratio, Jaro-Winkler) + pre-trained fastText cosine similarity (Signal Set C) + n-gram Jaccard (supplementary) + graph-corroborated adaptive scoring (Signal Set B — six enumerated signals B1–B6; B1/B2/B4/B5/B6 shipped in 8a, B3 lands with feature 8b's transactions table; total boost capped at +0.20, all boosts logged) + category-pair weight dispatch via `Dict[Tuple[str, str], WeightConfig]`.
+- Matching stack: RapidFuzz (token_set_ratio, partial_ratio, Jaro-Winkler) + pre-trained fastText cosine similarity (Signal Set C) + n-gram Jaccard (supplementary) + graph-corroborated adaptive scoring (Signal Set B — six enumerated signals B1–B6, all `[BUILT]`: B1/B2/B4/B5/B6 shipped in 8a, B3 (amount co-occurrence over the `transactions` table) shipped in 8b; total boost capped at +0.20, all boosts logged) + category-pair weight dispatch via `Dict[Tuple[str, str], WeightConfig]`.
 - Blocking: TokenIndex + trigram n-gram index + pre-trained fastText ANN (Stage 2c). Pre-trained vectors only — zero corpus dependency.
 - Graph store: SQLite with explicit edge tables carrying category metadata.
 - LLM fallback: Claude API, redacted, Tier 3 only (<15% of entities, 0.50–0.70 confidence band; abbreviation-heuristic pairs in that band skip the LLM and route straight to human review — see §5). Never auto-approves.
@@ -44,7 +44,7 @@ corroborating evidence — accounting↔psa proves the V1 thesis.
 
 ```python
 # [PLANNED] No CanonicalEntity class exists. core/graph/entity_store.py exists but is a read-only
-# query interface and does not define it. The canonical DDL lives in db/schema_sqlite.sql:6-58;
+# query interface and does not define it. The canonical DDL lives in db/schema_sqlite.sql;
 # this literal remains the byte-exact spec shape until a CanonicalEntity type actually ships.
 {
     "canonical_id": "CLIENT_0042",
@@ -137,11 +137,11 @@ class ConnectorInterface:
 
 ## 10. DATA SECURITY (target posture — status marked per line)
 
-- `[PLANNED]` OAuth tokens encrypted at rest with customer-specific keys, scoped per system category. Today: tokens sit in a plaintext in-memory dict (`connectors/quickbooks.py:73`). No crypto/KMS anywhere in the tree.
-- `[PLANNED]` Every database query RLS-scoped by `tenant_id`. Today: a `tenant_id` COLUMN exists (`db/schema_sqlite.sql:8`, `db/schema.sql:38`) but zero queries filter on it; `core/` has no `tenant_id` references; `connectors/` use it only as a credential-lookup key. No `CREATE POLICY` / row-level security exists.
-- `[PARTIAL]` Audit log: append-only (no UPDATE/DELETE), each row tagged by system category. Today: table DDL exists in the POSTGRES schema only (`db/schema.sql:106-117`); "append-only" is a SQL comment, not a trigger/REVOKE/RULE; the writer `api/middleware/audit.py` is a 4-line "Not yet implemented" stub.
-- `[BUILT]` LLM redaction: organizational entities — strip identifiers, preserve category metadata; person entities — strip ALL identifiers including names, emails, and IDs. (`core/matching/redaction.py`, wired into the live path at `core/matching/llm_fallback.py:538`/`:552` — inbound `leak_check`, outbound scrub; covered by `tests/test_redaction.py`.)
-- `[BUILT]` All credential files listed in `.gitignore` before first commit (`.gitignore:2-4`, `:39-41`).
+- `[PLANNED]` OAuth tokens encrypted at rest with customer-specific keys, scoped per system category. Today: tokens sit in a plaintext dict (`InMemoryTokenStore` in `connectors/quickbooks.py`). No crypto/KMS anywhere in the tree.
+- `[PLANNED]` Every database query RLS-scoped by `tenant_id`. Today: a `tenant_id` COLUMN exists in both schemas but zero queries filter on it; `core/` has no `tenant_id` references; `connectors/` use it only as a credential-lookup key. No `CREATE POLICY` / row-level security exists.
+- `[PARTIAL]` Audit log: append-only (no UPDATE/DELETE), each row tagged by system category. Today: `audit_log` DDL exists in the POSTGRES schema only; "append-only" is a SQL comment, not a trigger/REVOKE/RULE; the writer `api/middleware/audit.py` is a "Not yet implemented" stub.
+- `[BUILT]` LLM redaction: organizational entities — strip identifiers, preserve category metadata; person entities — strip ALL identifiers including names, emails, and IDs. (`core/matching/redaction.py`, wired into the live path by the `leak_check` calls in `core/matching/llm_fallback.py` — inbound on the prompt, outbound scrub on `reasoning`; covered by `tests/test_redaction.py`.)
+- `[BUILT]` All credential files (`.env`, `*.pem`, `*.key`) and local SQLite graph files are `.gitignore`d.
 
 ## 11. NOT-SCOPE
 
@@ -158,10 +158,10 @@ class ConnectorInterface:
 
 <!-- TODO: Migrate inline schemas/pipeline/contract/thresholds out of this rules file once the owning modules below ship; this section becomes the redirect index. -->
 
-- Schemas (canonical entity, edge) -> `[BUILT]` canonical DDL is `db/schema_sqlite.sql:6-58`. `core/graph/entity_store.py` exists (557 lines) but is a read-only query interface for Stages 1–2, NOT the schema.
+- Schemas (canonical entity, edge) -> `[BUILT]` canonical DDL is the graph-table block in `db/schema_sqlite.sql`. `core/graph/entity_store.py` exists but is a read-only query interface for Stages 1–3, NOT the schema.
 - Pipeline (Stage 0–6) -> `[PLANNED]` `core/matching/engine.py` DOES NOT EXIST; no Stage 0–6 orchestrator exists. Stages are separate unconnected modules (`core/ingestion/normalizer.py` = Stage 0; `blocking.py`, `scoring.py`, `disposition.py`, `llm_fallback.py`). Stage 6 is unbuilt. Feature 12 (matcher-orchestrator) is the queued feature that will create this file.
-- Connector contract -> `[BUILT]` `connectors/base.py` (`ConnectorInterface` ABC at `:171`).
-- Confidence thresholds -> `[BUILT]` `core/matching/disposition.py:54-56` (`AUTO_APPROVE_THRESHOLD = 0.90`, `SURFACE_THRESHOLD = 0.70`, LLM/NO_MATCH boundary `0.50`). `core/matching/confidence.py` `[PLANNED]` — does not exist. §5's threshold VALUES remain correct; only the file pointer was wrong.
+- Connector contract -> `[BUILT]` `connectors/base.py` (`ConnectorInterface` ABC).
+- Confidence thresholds -> `[BUILT]` module constants in `core/matching/disposition.py` (`AUTO_APPROVE_THRESHOLD = 0.90`, `SURFACE_THRESHOLD = 0.70`, `LLM_FALLBACK_THRESHOLD = 0.50`). `core/matching/confidence.py` `[PLANNED]` — does not exist. §5's threshold VALUES remain correct; only the file pointer was wrong.
 
 ## 13. SESSION GUARDRAILS
 
