@@ -21,3 +21,9 @@ Brief: features/pipeline/b3-transactions-table-and-amount-signal.md
 Tests: 356 passed
 Reviews: QA PASS (blind), Code PASS
 Gates: QB=NOT RUN, Exercise=SKIPPED
+
+## 2026-08-22 — 10 (shipped by rocket)
+Brief: features/pipeline/resolution-graph-update.md
+Tests: 380 passed
+Reviews: QA PASS (blind), Code PASS
+Gates: QB=NOT RUN, Exercise=SKIPPED

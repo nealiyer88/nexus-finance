@@ -98,3 +98,28 @@ This implementation adds a new matching signal that recognizes when two entities
 
 ### 2026-08-22T13:56:17 · 10 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
 The reality check flagged two issues: the brief has outdated counts for one key module (feature 8b added a function it didn't account for), and it describes using the redaction system in a way that doesn't match its actual design. The flag means the brief needs revision before building can proceed.
+
+### 2026-08-22T18:51:10 · 10 · 🚀 Starting 10 (resolution-graph-update.md)
+
+### 2026-08-22T18:51:10 · 10 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-22T18:53:15 · 10 · ✅ reality check GO — brief matches the current repo
+
+### 2026-08-22T18:54:55 · 10 · 📝 Wrote the build prompt
+The team is implementing the final stage of the entity-matching pipeline: the code that takes decisions about which entities belong together, saves those connections to the database, and records them (with privacy safeguards) for model improvement.
+
+### 2026-08-22T18:55:04 · 10 · 🔨 Builder starting — code + tests + commit
+### 19:03:09 · 10 · 🔨 building
+### 19:03:45 · 10 · 🧪 tests green (380 passed)
+
+### 2026-08-22T19:04:27 · 10 · 🧹 fast gates PASS
+
+### 2026-08-22T19:04:27 · 10 · 🔍 qa review running
+
+### 2026-08-22T19:05:21 · 10 · 🔍 code review running
+
+### 2026-08-22T19:06:20 · 10 · 🧪 review round 1 — QA=PASS Code=PASS
+
+### 2026-08-22T19:06:20 · 10 · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
+
+### 2026-08-22T19:06:22 · 10 · 🚦 full gates PASS — clear to ship
