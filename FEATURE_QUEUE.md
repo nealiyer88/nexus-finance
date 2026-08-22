@@ -29,7 +29,7 @@
 | 8a | fasttext-signal-retrofit | features/pipeline/fasttext-signal-retrofit.md | 7, 8 | SHIPPED | v4 §5,9,17 |
 | 8b | b3-transactions-table-and-amount-signal | features/pipeline/b3-transactions-table-and-amount-signal.md | 8a | SHIPPED | v4 §9 B3 |
 | 9 | threshold-llm-fallback | features/pipeline/threshold-llm-fallback.md | 8 | SHIPPED | v3 (unaffected by v4) |
-| 10 | resolution-graph-update | features/pipeline/resolution-graph-update.md | 9 | QUEUED | v4 §9 |
+| 10 | resolution-graph-update | features/pipeline/resolution-graph-update.md | 9 | BLOCKED | v4 §9 |
 | 10a | postgres-store-bootstrap | features/infrastructure/postgres-store-bootstrap.md | 2, 10 | QUEUED | v4 §8,10 |
 | 11 | approval-queue | features/dashboard/approval-queue.md | 9, 10 | QUEUED | v4 |
 | 12 | matcher-orchestrator | features/pipeline/matcher-orchestrator.md | 7, 8, 8a, 8b, 9, 10 | QUEUED | v4 §7 |
