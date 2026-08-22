@@ -2,31 +2,41 @@
 
 > Pipeline reads this table to determine build order. Status updated as features ship. Dependencies are strict — downstream features cannot start until all dependencies are SHIPPED.
 
-> **Column ORDER is load-bearing — rocket.sh parses: `# | Feature | Brief | Depends On | Spec | Status`.** Do not reorder. Dependencies are a comma-separated list of feature IDs (ALL must be SHIPPED); the old `X or Y` and `ALL` syntaxes are not supported by upstream rocket.sh and have been flattened during migration.
+> **Column ORDER is load-bearing — rocket.sh parses: `# | Feature | Brief | Depends On | Status | Spec`.** Do not reorder. Dependencies are a comma-separated list of feature IDs (ALL must be SHIPPED); the old `X or Y` and `ALL` syntaxes are not supported by upstream rocket.sh and have been flattened during migration.
+>
+> **Status MUST be the 6th column and Spec MUST come after it.** Upstream rocket.sh
+> hard-codes the position: `get_next_feature`, `feature_deps`, the co-scheduling
+> scan, and `_promote_verify_row` all read `$6` as Status and stop there. Spec sitting
+> at `$6` makes every row read as status `v4 …` instead of `QUEUED`, so NO feature is
+> ever eligible and the loop exits reporting "0 features processed" with no error —
+> while the SHIPPED/QUEUED tallies still look correct, because those grep the whole
+> line. Do not "fix" this by patching rocket.sh: that patch existed before
+> 2026-08-11, was silently dropped by a harness upgrade, and cost a run. Anything
+> after Status is ignored in feature mode, which is why Spec is safe there.
 >
 > **Spec column** points each row at the product-spec version the brief was authored against (e.g. `v3`, `v4`, `v4 §5,9,17` when a specific section is load-bearing). Features SHIPPED under an earlier spec carry that spec's tag — retrofit rows (e.g. 8a) update them. This makes every row auditable against the canonical spec at any moment.
 
-| # | Feature | Brief | Depends On | Spec | Status |
-|---|---------|-------|------------|------|--------|
-| 1 | rules-file-population | features/infrastructure/rules-file-population.md | — | v3 | SHIPPED |
-| 2 | canonical-schema | features/infrastructure/canonical-schema.md | 1 | v3 | SHIPPED |
-| 3 | normalizer | features/pipeline/normalizer.md | 1, 2 | v3 | SHIPPED |
-| 4 | connector-base | features/infrastructure/connector-base.md | 2, 3 | v3 | SHIPPED |
-| 5 | qb-connector | features/connectors/qb-connector.md | 3, 4 | v3 | SHIPPED |
-| 6 | ruddr-connector | features/connectors/ruddr-connector.md | 3, 4 | v3 | SHIPPED |
-| 7 | deterministic-blocking | features/pipeline/deterministic-blocking.md | 4, 5, 6 | v3 (retrofit by 8a) | SHIPPED |
-| 8 | pairwise-scoring | features/pipeline/pairwise-scoring.md | 7 | v3 (retrofit by 8a) | SHIPPED |
-| 8a | fasttext-signal-retrofit | features/pipeline/fasttext-signal-retrofit.md | 7, 8 | v4 §5,9,17 | SHIPPED |
-| 8b | b3-transactions-table-and-amount-signal | features/pipeline/b3-transactions-table-and-amount-signal.md | 8a | v4 §9 B3 | QUEUED |
-| 9 | threshold-llm-fallback | features/pipeline/threshold-llm-fallback.md | 8 | v3 (unaffected by v4) | SHIPPED |
-| 10 | resolution-graph-update | features/pipeline/resolution-graph-update.md | 9 | v4 | QUEUED |
-| 11 | approval-queue | features/dashboard/approval-queue.md | 9, 10 | v4 | QUEUED |
-| 12 | matcher-orchestrator | features/pipeline/matcher-orchestrator.md | 7, 8, 8a, 8b, 9, 10 | v4 §7 | QUEUED |
-| 13 | historical-cold-start | features/data/historical-cold-start.md | 11, 12 | v4 | QUEUED |
-| 14 | overview-entity-browser | features/dashboard/overview-entity-browser.md | 10, 11 | v4 | QUEUED |
-| 15 | ar-reconciliation | features/dashboard/ar-reconciliation.md | 12, 14 | v4 | QUEUED |
-| 16 | connectors-audit-infra | features/infrastructure/connectors-audit-infra.md | 5, 6 | v4 | QUEUED |
-| 17 | signup-onboarding | features/infrastructure/signup-onboarding.md | 1, 2, 3, 4, 5, 6, 7, 8, 8a, 9, 10, 11, 12, 13, 14, 15, 16 | v4 | QUEUED |
+| # | Feature | Brief | Depends On | Status | Spec |
+|---|---------|-------|------------|--------|------|
+| 1 | rules-file-population | features/infrastructure/rules-file-population.md | — | SHIPPED | v3 |
+| 2 | canonical-schema | features/infrastructure/canonical-schema.md | 1 | SHIPPED | v3 |
+| 3 | normalizer | features/pipeline/normalizer.md | 1, 2 | SHIPPED | v3 |
+| 4 | connector-base | features/infrastructure/connector-base.md | 2, 3 | SHIPPED | v3 |
+| 5 | qb-connector | features/connectors/qb-connector.md | 3, 4 | SHIPPED | v3 |
+| 6 | ruddr-connector | features/connectors/ruddr-connector.md | 3, 4 | SHIPPED | v3 |
+| 7 | deterministic-blocking | features/pipeline/deterministic-blocking.md | 4, 5, 6 | SHIPPED | v3 (retrofit by 8a) |
+| 8 | pairwise-scoring | features/pipeline/pairwise-scoring.md | 7 | SHIPPED | v3 (retrofit by 8a) |
+| 8a | fasttext-signal-retrofit | features/pipeline/fasttext-signal-retrofit.md | 7, 8 | SHIPPED | v4 §5,9,17 |
+| 8b | b3-transactions-table-and-amount-signal | features/pipeline/b3-transactions-table-and-amount-signal.md | 8a | QUEUED | v4 §9 B3 |
+| 9 | threshold-llm-fallback | features/pipeline/threshold-llm-fallback.md | 8 | SHIPPED | v3 (unaffected by v4) |
+| 10 | resolution-graph-update | features/pipeline/resolution-graph-update.md | 9 | QUEUED | v4 |
+| 11 | approval-queue | features/dashboard/approval-queue.md | 9, 10 | QUEUED | v4 |
+| 12 | matcher-orchestrator | features/pipeline/matcher-orchestrator.md | 7, 8, 8a, 8b, 9, 10 | QUEUED | v4 §7 |
+| 13 | historical-cold-start | features/data/historical-cold-start.md | 11, 12 | QUEUED | v4 |
+| 14 | overview-entity-browser | features/dashboard/overview-entity-browser.md | 10, 11 | QUEUED | v4 |
+| 15 | ar-reconciliation | features/dashboard/ar-reconciliation.md | 12, 14 | QUEUED | v4 |
+| 16 | connectors-audit-infra | features/infrastructure/connectors-audit-infra.md | 5, 6 | QUEUED | v4 |
+| 17 | signup-onboarding | features/infrastructure/signup-onboarding.md | 1, 2, 3, 4, 5, 6, 7, 8, 8a, 9, 10, 11, 12, 13, 14, 15, 16 | QUEUED | v4 |
 
 > **v4 retrofit note (2026-06-20):** Product spec v4 made pre-trained fastText
 > V1-mandatory (Stage 2c blocking + Stage 3 Signal Set C) and raised the Phase 1
@@ -41,10 +51,17 @@
 > Phase 1 success gate (90% → 95%) still needs updating in TEMPLATE.md, roadmap.md,
 > and the Phase-1 success criteria of the pipeline feature briefs.
 
-> **Spec column added (2026-06-20):** rocket.sh parser updated in the same commit
-> to read 6 columns instead of 5. The `Spec` field is audit metadata only — the
-> parser does not gate on it. Feature 12's `Depends On` updated to include 8a
-> explicitly (v4 retrofit note flagged this dependency).
+> **Spec column added (2026-06-20):** rocket.sh was patched in the same commit to
+> read 6 columns instead of 5, with Spec BEFORE Status. The `Spec` field is audit
+> metadata only — the parser does not gate on it. Feature 12's `Depends On` updated
+> to include 8a explicitly (v4 retrofit note flagged this dependency).
+>
+> **Superseded (2026-08-22):** that rocket.sh patch was the only local change to the
+> file, and the 2026-08-11 harness upgrade replaced rocket.sh wholesale — dropping it.
+> The next run selected nothing and exited "0 features processed" with no error.
+> Fixed by moving Spec AFTER Status so stock upstream rocket.sh parses the table
+> unmodified. The harness is now un-patched and upgrades cleanly; the column order
+> is what carries the compatibility.
 
 <!--
 Migration notes (2026-06-20):
