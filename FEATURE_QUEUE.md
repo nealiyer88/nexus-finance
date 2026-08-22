@@ -27,7 +27,7 @@
 | 7 | deterministic-blocking | features/pipeline/deterministic-blocking.md | 4, 5, 6 | SHIPPED | v3 (retrofit by 8a) |
 | 8 | pairwise-scoring | features/pipeline/pairwise-scoring.md | 7 | SHIPPED | v3 (retrofit by 8a) |
 | 8a | fasttext-signal-retrofit | features/pipeline/fasttext-signal-retrofit.md | 7, 8 | SHIPPED | v4 §5,9,17 |
-| 8b | b3-transactions-table-and-amount-signal | features/pipeline/b3-transactions-table-and-amount-signal.md | 8a | QUEUED | v4 §9 B3 |
+| 8b | b3-transactions-table-and-amount-signal | features/pipeline/b3-transactions-table-and-amount-signal.md | 8a | BLOCKED | v4 §9 B3 |
 | 9 | threshold-llm-fallback | features/pipeline/threshold-llm-fallback.md | 8 | SHIPPED | v3 (unaffected by v4) |
 | 10 | resolution-graph-update | features/pipeline/resolution-graph-update.md | 9 | QUEUED | v4 |
 | 11 | approval-queue | features/dashboard/approval-queue.md | 9, 10 | QUEUED | v4 |
