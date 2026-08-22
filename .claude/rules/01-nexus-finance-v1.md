@@ -2,6 +2,15 @@
 
 Architectural guardrails for V1 Claude Code sessions. This file is loaded every session — keep it lean.
 
+## 0. BUILT vs PLANNED — read this before assuming anything exists
+
+- GENERAL RULE: this file describes the TARGET architecture. Anything not marked `[BUILT]` must be treated as NOT EXISTING. A feature brief must not claim an unmarked or `[PLANNED]`/`[PARTIAL]` item as a satisfied dependency. Markers: `[BUILT]` = verified in tree, `[PARTIAL]` = partly real, `[PLANNED]` = does not exist.
+- `[BUILT]` SQLite is the ONLY real engine in V1 — every runtime and test path uses `sqlite3`.
+- `[PLANNED]` `db/schema.sql` and `db/migrations/001` (Postgres/Supabase) are ASPIRATIONAL: no code imports psycopg or reads them; only `tests/test_schema_parity.py` parses `schema.sql` as text.
+- `[PLANNED]` Tables `approval_decisions` and `audit_log` exist in the Postgres schema ONLY — never created or queried at runtime.
+- `[BUILT]` `db/schema_sqlite.sql` has exactly 4 tables: `canonical_entities`, `entity_aliases`, `entity_edges`, `system_references`. The only other real SQLite table is `llm_training_data`.
+- `[PLANNED]` There is NO auth: `supabase==2.9.0` is pinned but never imported; `api/routers/auth.py`, `api/middleware/tenant.py`, `api/middleware/audit.py` are stubs; `api/main.py` exposes only `/health`.
+
 ## 1. V1 SCOPE
 
 - Connectors: QuickBooks Online (category: accounting) + RUDDR (category: psa). No others.
@@ -34,7 +43,9 @@ corroborating evidence — accounting↔psa proves the V1 thesis.
 ## 3. CANONICAL ENTITY SCHEMA
 
 ```python
-# TODO: Replace with core.graph.entity_store.CanonicalEntity reference once canonical-schema ships
+# [PLANNED] No CanonicalEntity class exists. core/graph/entity_store.py exists but is a read-only
+# query interface and does not define it. The canonical DDL lives in db/schema_sqlite.sql:6-58;
+# this literal remains the byte-exact spec shape until a CanonicalEntity type actually ships.
 {
     "canonical_id": "CLIENT_0042",
     "canonical_name": "Cenlar FSB",
@@ -124,13 +135,13 @@ class ConnectorInterface:
 - Legal name vs. preferred name handling (e.g., `Robert` vs. `Bob`).
 - Initials and abbreviation expansion (`N. Iyer` <-> `Neal Iyer`).
 
-## 10. DATA SECURITY
+## 10. DATA SECURITY (target posture — status marked per line)
 
-- OAuth tokens encrypted at rest with customer-specific keys, scoped per system category.
-- Every database query RLS-scoped by `tenant_id`.
-- Audit log: append-only (no UPDATE/DELETE), each row tagged by system category.
-- LLM redaction: organizational entities — strip identifiers, preserve category metadata; person entities — strip ALL identifiers including names, emails, and IDs.
-- All credential files listed in `.gitignore` before first commit.
+- `[PLANNED]` OAuth tokens encrypted at rest with customer-specific keys, scoped per system category. Today: tokens sit in a plaintext in-memory dict (`connectors/quickbooks.py:73`). No crypto/KMS anywhere in the tree.
+- `[PLANNED]` Every database query RLS-scoped by `tenant_id`. Today: a `tenant_id` COLUMN exists (`db/schema_sqlite.sql:8`, `db/schema.sql:38`) but zero queries filter on it; `core/` has no `tenant_id` references; `connectors/` use it only as a credential-lookup key. No `CREATE POLICY` / row-level security exists.
+- `[PARTIAL]` Audit log: append-only (no UPDATE/DELETE), each row tagged by system category. Today: table DDL exists in the POSTGRES schema only (`db/schema.sql:106-117`); "append-only" is a SQL comment, not a trigger/REVOKE/RULE; the writer `api/middleware/audit.py` is a 4-line "Not yet implemented" stub.
+- `[BUILT]` LLM redaction: organizational entities — strip identifiers, preserve category metadata; person entities — strip ALL identifiers including names, emails, and IDs. (`core/matching/redaction.py`, wired into the live path at `core/matching/llm_fallback.py:538`/`:552` — inbound `leak_check`, outbound scrub; covered by `tests/test_redaction.py`.)
+- `[BUILT]` All credential files listed in `.gitignore` before first commit (`.gitignore:2-4`, `:39-41`).
 
 ## 11. NOT-SCOPE
 
@@ -147,10 +158,10 @@ class ConnectorInterface:
 
 <!-- TODO: Migrate inline schemas/pipeline/contract/thresholds out of this rules file once the owning modules below ship; this section becomes the redirect index. -->
 
-- Schemas (canonical entity, edge) -> `core/graph/entity_store.py`
-- Pipeline (Stage 0–6) -> `core/matching/engine.py`
-- Connector contract -> `connectors/base.py`
-- Confidence thresholds -> `core/matching/confidence.py`
+- Schemas (canonical entity, edge) -> `[BUILT]` canonical DDL is `db/schema_sqlite.sql:6-58`. `core/graph/entity_store.py` exists (557 lines) but is a read-only query interface for Stages 1–2, NOT the schema.
+- Pipeline (Stage 0–6) -> `[PLANNED]` `core/matching/engine.py` DOES NOT EXIST; no Stage 0–6 orchestrator exists. Stages are separate unconnected modules (`core/ingestion/normalizer.py` = Stage 0; `blocking.py`, `scoring.py`, `disposition.py`, `llm_fallback.py`). Stage 6 is unbuilt. Feature 12 (matcher-orchestrator) is the queued feature that will create this file.
+- Connector contract -> `[BUILT]` `connectors/base.py` (`ConnectorInterface` ABC at `:171`).
+- Confidence thresholds -> `[BUILT]` `core/matching/disposition.py:54-56` (`AUTO_APPROVE_THRESHOLD = 0.90`, `SURFACE_THRESHOLD = 0.70`, LLM/NO_MATCH boundary `0.50`). `core/matching/confidence.py` `[PLANNED]` — does not exist. §5's threshold VALUES remain correct; only the file pointer was wrong.
 
 ## 13. SESSION GUARDRAILS
 

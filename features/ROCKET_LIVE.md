@@ -43,3 +43,24 @@ The engineer reviewed whether feature 8b (adding a transaction-matching signal) 
 
 ### 2026-07-05T22:27:03 · 8B · ⚖️ Reconciled the debate into a hardened plan
 The team added a new matching signal that recognizes when two entities from different systems had transaction amounts that align within a 2% tolerance in the same month—a strong clue they're the same real-world client or vendor. The database design is complete and tested across both database engines, but the actual data ingestion from source systems is deferred to a separate feature, so in this build phase the signal only fires against test fixtures. A later feature will wire up live transaction syncing and measure whether this signal meaningfully improves the matching accuracy.
+
+### 2026-08-22T08:38:42 · 8B · 🚀 Starting 8b (b3-transactions-table-and-amount-signal.md)
+
+### 2026-08-22T08:38:42 · 8B · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-22T08:41:14 · 8B · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The reality check found three major problems with the feature brief: it assumes database security patterns that don't exist in the codebase, it references an amount-comparison rule that's undefined in code, and it lacks concrete success criteria needed to verify the work is done correctly. These mismatches between the brief and the actual codebase need to be resolved with clear decisions before the team starts building.
+
+### 2026-08-22T08:41:24 · 10 · 🚀 Starting 10 (resolution-graph-update.md)
+
+### 2026-08-22T08:41:24 · 10 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-22T08:43:40 · 10 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The feature is ready in concept but blocked by four concrete issues: the database doesn't have the tables it needs for storing approvals and audit trails, there's a mismatch in how tenant data is handled between test and production schemas, the test command won't actually run in this repo, and column names need alignment. All fixable, but they need explicit decisions before the team can start building.
+
+### 2026-08-22T08:43:49 · 16 · 🚀 Starting 16 (connectors-audit-infra.md)
+
+### 2026-08-22T08:43:49 · 16 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-22T08:46:25 · 16 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The build flagged feature 16 as blocked: it assumes database infrastructure (Supabase auth and tenant isolation policies) that doesn't exist yet, and the team needs to decide upfront whether those are in scope or handled separately. Additionally, five success criteria can't be verified as written—missing a Dash app to render pages, test tables that don't exist in the SQLite schema, and a mismatched test-runner command.

@@ -216,3 +216,12 @@
 | 2026-07-05T22:26:17 | 8b | adversary-engineer | opus | done |
 | 2026-07-05T22:27:03 | 8b | cost:reconcile | claude | $0.20077025 |
 | 2026-07-05T22:27:03 | 8b | reconcile | opus | done |
+| 2026-08-22T08:41:14 | 8b | cost:reality-check | claude | $0.9929965 |
+| 2026-08-22T08:41:14 | 8b | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/8b-reality-check.md |
+| 2026-08-22T08:41:14 | 8b | reality-check | opus | FLAG (blocked; see features/_reality/8b-reality-check.md) |
+| 2026-08-22T08:43:40 | 10 | cost:reality-check | claude | $1.1532959999999999 |
+| 2026-08-22T08:43:40 | 10 | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/10-reality-check.md |
+| 2026-08-22T08:43:40 | 10 | reality-check | opus | FLAG (blocked; see features/_reality/10-reality-check.md) |
+| 2026-08-22T08:46:25 | 16 | cost:reality-check | claude | $1.0002205 |
+| 2026-08-22T08:46:25 | 16 | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/16-reality-check.md |
+| 2026-08-22T08:46:25 | 16 | reality-check | opus | FLAG (blocked; see features/_reality/16-reality-check.md) |
