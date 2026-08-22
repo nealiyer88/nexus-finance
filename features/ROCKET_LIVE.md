@@ -64,3 +64,28 @@ The feature is ready in concept but blocked by four concrete issues: the databas
 
 ### 2026-08-22T08:46:25 · 16 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
 The build flagged feature 16 as blocked: it assumes database infrastructure (Supabase auth and tenant isolation policies) that doesn't exist yet, and the team needs to decide upfront whether those are in scope or handled separately. Additionally, five success criteria can't be verified as written—missing a Dash app to render pages, test tables that don't exist in the SQLite schema, and a mismatched test-runner command.
+
+### 2026-08-22T13:41:48 · 8B · 🚀 Starting 8b (b3-transactions-table-and-amount-signal.md)
+
+### 2026-08-22T13:41:48 · 8B · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-22T13:43:55 · 8B · ✅ reality check GO — brief matches the current repo
+
+### 2026-08-22T13:45:15 · 8B · 📝 Wrote the build prompt
+This implementation adds a new matching signal that recognizes when two entities from different business systems show transaction amounts within 2% (or $500) of each other in the same month—a pattern that suggests they're the same customer or vendor. The system stores all transactions in a new database table and uses this amount co-occurrence as additional evidence during the matching process to improve confidence when the score is borderline.
+
+### 2026-08-22T13:45:28 · 8B · 🔨 Builder starting — code + tests + commit
+### 13:46:40 · 8b · 🔨 building
+### 13:51:28 · 8b · 🧪 tests green (356 passed)
+
+### 2026-08-22T13:51:44 · 8B · 🧹 fast gates PASS
+
+### 2026-08-22T13:51:44 · 8B · 🔍 qa review running
+
+### 2026-08-22T13:52:43 · 8B · 🔍 code review running
+
+### 2026-08-22T13:53:51 · 8B · 🧪 review round 1 — QA=PASS Code=PASS
+
+### 2026-08-22T13:53:51 · 8B · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
+
+### 2026-08-22T13:53:53 · 8B · 🚦 full gates PASS — clear to ship
