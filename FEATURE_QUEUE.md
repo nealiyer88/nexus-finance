@@ -35,7 +35,7 @@
 | 13 | historical-cold-start | features/data/historical-cold-start.md | 11, 12 | QUEUED | v4 |
 | 14 | overview-entity-browser | features/dashboard/overview-entity-browser.md | 10, 11 | QUEUED | v4 |
 | 15 | ar-reconciliation | features/dashboard/ar-reconciliation.md | 12, 14 | QUEUED | v4 |
-| 16 | connectors-audit-infra | features/infrastructure/connectors-audit-infra.md | 5, 6 | QUEUED | v4 |
+| 16 | connectors-audit-infra | features/infrastructure/connectors-audit-infra.md | 5, 6 | BLOCKED | v4 |
 | 17 | signup-onboarding | features/infrastructure/signup-onboarding.md | 1, 2, 3, 4, 5, 6, 7, 8, 8a, 9, 10, 11, 12, 13, 14, 15, 16 | QUEUED | v4 |
 
 > **v4 retrofit note (2026-06-20):** Product spec v4 made pre-trained fastText
