@@ -502,6 +502,89 @@ def count_shared_graph_neighbors(
 
 
 # ---------------------------------------------------------------------------
+# Stage 3 reads (Signal B3 — amount co-occurrence)
+# ---------------------------------------------------------------------------
+
+# AMOUNT_TOLERANCE (rules §5): a co-occurrence exists when two same-
+# currency, different-source transaction amounts differ by no more than
+# the lesser of a percentage band and a flat dollar cap. USD, V1.
+AMOUNT_TOLERANCE_PCT: float = 0.02
+AMOUNT_TOLERANCE_CAP: float = 500.0
+
+
+def count_amount_cooccurrence_periods(
+    conn: sqlite3.Connection,
+    source: str,
+    source_entity_id: str,
+    candidate_canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> int:
+    """Count DISTINCT `period`s (Signal B3) in which a `source`-side
+    transaction for `source_entity_id` co-occurs with a same-period,
+    same-currency, different-source transaction whose `canonical_id`
+    is `candidate_canonical_id`, within `AMOUNT_TOLERANCE`.
+
+    Source side is keyed on `(source, counterparty_source_id)` —
+    never on a canonical id, since the entity is typically unresolved
+    at Stage 3. Candidate side is keyed on the nullable `canonical_id`
+    column. The tolerance predicate anchors on `MAX(|a|, |b|)`, so
+    `count_amount_cooccurrence_periods(a, b) ==
+    count_amount_cooccurrence_periods(b, a)` by construction. One
+    query, no per-row Python filtering.
+    """
+    if tenant_id is None:
+        row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT a.period)
+              FROM transactions AS a
+              JOIN transactions AS b
+                ON b.period = a.period
+               AND b.currency = a.currency
+               AND b.source != a.source
+             WHERE a.source = ?
+               AND a.counterparty_source_id = ?
+               AND b.canonical_id = ?
+               AND ABS(ABS(a.amount) - ABS(b.amount))
+                   <= MIN(MAX(ABS(a.amount), ABS(b.amount)) * ?, ?)
+            """,
+            (
+                source,
+                source_entity_id,
+                candidate_canonical_id,
+                AMOUNT_TOLERANCE_PCT,
+                AMOUNT_TOLERANCE_CAP,
+            ),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT a.period)
+              FROM transactions AS a
+              JOIN transactions AS b
+                ON b.period = a.period
+               AND b.currency = a.currency
+               AND b.source != a.source
+               AND b.tenant_id = a.tenant_id
+             WHERE a.source = ?
+               AND a.counterparty_source_id = ?
+               AND b.canonical_id = ?
+               AND a.tenant_id = ?
+               AND ABS(ABS(a.amount) - ABS(b.amount))
+                   <= MIN(MAX(ABS(a.amount), ABS(b.amount)) * ?, ?)
+            """,
+            (
+                source,
+                source_entity_id,
+                candidate_canonical_id,
+                tenant_id,
+                AMOUNT_TOLERANCE_PCT,
+                AMOUNT_TOLERANCE_CAP,
+            ),
+        ).fetchone()
+    return int(row[0]) if row else 0
+
+
+# ---------------------------------------------------------------------------
 # Stage 4 reads (threshold / cluster conflict)
 # ---------------------------------------------------------------------------
 

@@ -13,7 +13,7 @@ Scores `(NormalizedEntity, candidate canonical)` pairs surfaced by Stage 2
               category pair when one side is ≤4 chars with a matching
               prefix-token or first-letter initialism.
 
-    C.  Signal Set B (B1, B2, B4, B5, B6) — graph-corroborated adaptive
+    C.  Signal Set B (B1, B2, B3, B4, B5, B6) — graph-corroborated adaptive
         boosts, capped at +0.20 total. Only fire in the ambiguous band
         0.70 ≤ base_score < 0.90.
 
@@ -54,6 +54,7 @@ from rapidfuzz.distance import JaroWinkler
 
 from connectors.base import NormalizedEntity
 from core.graph.entity_store import (
+    count_amount_cooccurrence_periods,
     count_shared_graph_neighbors,
     count_shared_person_neighbors,
     get_aliases,
@@ -75,7 +76,7 @@ from core.matching.weights import WeightConfig, get_weights
 class BoostEntry:
     """One fired Signal Set B boost with raw and cap-applied values."""
 
-    signal_id: Literal["B1", "B2", "B4", "B5", "B6"]
+    signal_id: Literal["B1", "B2", "B3", "B4", "B5", "B6"]
     raw: float
     applied: float
 
@@ -221,8 +222,9 @@ def _compute_b_boosts(
     tenant_id: Optional[str] = None,
     person_count: Optional[int] = None,
     neighbor_count: Optional[int] = None,
+    amount_cooccurrence_periods: Optional[int] = None,
 ) -> tuple[BoostEntry, ...]:
-    """Compute Signal Set B (B1, B2, B4, B5, B6) adaptive boosts.
+    """Compute Signal Set B (B1, B2, B3, B4, B5, B6) adaptive boosts.
 
     Returns () when base_score is outside [0.70, 0.90) — boosts only
     apply in the ambiguous band where they are load-bearing evidence.
@@ -232,11 +234,16 @@ def _compute_b_boosts(
     `person_count` / `neighbor_count` accept shared-neighbor counts the
     caller already queried (score_pair queries them once for
     GraphEvidence per AC-23); None falls back to querying here.
+
+    `amount_cooccurrence_periods` accepts the B3 distinct-period count
+    the caller already queried (score_pair queries it once, only when
+    `in_b_band`); None means "skip B3" so existing direct-call tests
+    keep working unchanged. A count of 0 also contributes nothing.
     """
     if base_score < B_BOOST_BAND_LOW or base_score >= B_BOOST_BAND_HIGH:
         return ()
 
-    raws: list[tuple[Literal["B1", "B2", "B4", "B5", "B6"], float]] = []
+    raws: list[tuple[Literal["B1", "B2", "B3", "B4", "B5", "B6"], float]] = []
 
     # B1 — shared person neighbors (+0.05/person, cap 0.10)
     n_persons = (
@@ -255,6 +262,12 @@ def _compute_b_boosts(
     if overlap:
         b2_raw = 0.12 if len(overlap) >= 2 else 0.08
         raws.append(("B2", b2_raw))
+
+    # B3 — amount co-occurrence within tolerance, same period
+    # (+0.10 for 1 distinct co-occurring period, +0.15 for ≥2).
+    if amount_cooccurrence_periods is not None and amount_cooccurrence_periods > 0:
+        b3_raw = 0.15 if amount_cooccurrence_periods >= 2 else 0.10
+        raws.append(("B3", b3_raw))
 
     # B4 — matching email domain (+0.05 freemail, +0.08 corporate).
     # Source side: read the unresolved entity's own record first (the
@@ -691,6 +704,17 @@ def score_pair(
         if in_b_band
         else {}
     )
+    # B3 join keys are load-bearing: the source side is unresolved on
+    # the normal Stage 3 path, so key on (entity.source, entity.source_id)
+    # — never on source_canonical_id. Queried at most once per pair,
+    # only when in_b_band (mirrors the candidate_ext gating above).
+    amount_cooccurrence_periods = (
+        count_amount_cooccurrence_periods(
+            conn, entity.source, entity.source_id, candidate_id, tenant_id
+        )
+        if in_b_band
+        else None
+    )
     b_boosts = _compute_b_boosts(
         conn=conn,
         source_id=source_canonical_id,
@@ -703,6 +727,7 @@ def score_pair(
         tenant_id=tenant_id,
         person_count=person_count,
         neighbor_count=neighbor_count,
+        amount_cooccurrence_periods=amount_cooccurrence_periods,
     )
 
     score = _weighted_score(base_score, b_boosts)

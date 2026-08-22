@@ -82,6 +82,28 @@ CREATE TABLE IF NOT EXISTS system_references (
 );
 CREATE INDEX IF NOT EXISTS system_references_canonical ON system_references (canonical_id);
 
+-- Transactions (backs Signal B3 — amount co-occurrence). tenant_id
+-- mirrors the canonical_entities pattern: UUID NOT NULL here, nullable
+-- TEXT on the SQLite side.
+CREATE TABLE IF NOT EXISTS transactions (
+    txn_id                 BIGSERIAL PRIMARY KEY,
+    tenant_id              UUID NOT NULL REFERENCES tenants(id),
+    source                 TEXT NOT NULL,
+    category               TEXT NOT NULL,
+    external_source_id     TEXT NOT NULL,
+    txn_type               TEXT NOT NULL,
+    amount                 NUMERIC(18,2) NOT NULL,
+    currency               TEXT NOT NULL DEFAULT 'USD',
+    txn_date               DATE NOT NULL,
+    period                 TEXT NOT NULL,
+    counterparty_source_id TEXT,
+    canonical_id           TEXT REFERENCES canonical_entities(canonical_id),
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (tenant_id, source, external_source_id)
+);
+CREATE INDEX IF NOT EXISTS transactions_counterparty ON transactions (tenant_id, source, counterparty_source_id, period);
+CREATE INDEX IF NOT EXISTS transactions_canonical    ON transactions (tenant_id, canonical_id, period);
+
 -- Approval decisions (structured training data capture for V2+ fine-tuning)
 CREATE TABLE IF NOT EXISTS approval_decisions (
     decision_id            BIGSERIAL PRIMARY KEY,

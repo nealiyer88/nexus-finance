@@ -16,6 +16,7 @@ from typing import Any, Optional
 
 import pytest
 
+from core.graph.entity_store import count_amount_cooccurrence_periods
 from core.ingestion.normalizer import normalize_entity
 from core.matching.disposition import apply_thresholds
 from core.matching.embeddings import _model_present
@@ -27,6 +28,7 @@ from core.matching.scoring import (
     _check_psa_abbreviation,
     _compute_b_boosts,
     _tokens_abbreviate,
+    _weighted_score,
     ngram_jaccard,
     score_candidate_set,
     score_pair,
@@ -118,6 +120,49 @@ def _insert_edge(
         ) VALUES (?, ?, ?, ?, ?, ?)
         """,
         (source_node, target_node, relationship, source_category, target_category, 1.0),
+    )
+
+
+def _insert_txn(
+    conn: sqlite3.Connection,
+    source: str,
+    external_source_id: str,
+    amount: float,
+    txn_date: str,
+    category: str = "accounting",
+    txn_type: str = "invoice",
+    currency: str = "USD",
+    counterparty_source_id: Optional[str] = None,
+    canonical_id: Optional[str] = None,
+    tenant_id: Optional[str] = None,
+    period: Optional[str] = None,
+) -> None:
+    """Seed a raw `transactions` row. `period` defaults to `txn_date[:7]`
+    (correct derivation); tests exercising a mis-derived period pass it
+    explicitly."""
+    if period is None:
+        period = txn_date[:7]
+    conn.execute(
+        """
+        INSERT INTO transactions (
+            tenant_id, source, category, external_source_id, txn_type,
+            amount, currency, txn_date, period, counterparty_source_id,
+            canonical_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            tenant_id,
+            source,
+            category,
+            external_source_id,
+            txn_type,
+            amount,
+            currency,
+            txn_date,
+            period,
+            counterparty_source_id,
+            canonical_id,
+        ),
     )
 
 
@@ -1208,3 +1253,450 @@ def test_token_level_abbreviation_gated_to_psa_accounting_pair() -> None:
         candidate_category="accounting",
     )
     assert fired is False
+
+
+# ---------------------------------------------------------------------------
+# 13. Signal B3 — amount co-occurrence (feature 8b)
+# ---------------------------------------------------------------------------
+
+
+def test_b3_symmetry_via_mirrored_score_pair(conn: sqlite3.Connection) -> None:
+    """(1) Symmetry: B3(entity -> candidate) == B3(candidate -> entity)
+    at a boundary amount, asserted via two mirrored score_pair calls.
+    `_base_weighted_score` is mocked to land both pairs in the band."""
+    import unittest.mock as _mock
+
+    _insert_txn(conn, "quickbooks", "QB-SRC-X", 1000.00, "2026-03-15",
+                counterparty_source_id="QB-X")
+    _insert_txn(conn, "ruddr", "RUDDR-CAND-Y", 1000.00, "2026-03-20",
+                category="psa", canonical_id="CAN-Y")
+    _insert_txn(conn, "ruddr", "RUDDR-SRC-Y", 1000.00, "2026-03-15",
+                category="psa", counterparty_source_id="RUDDR-Y")
+    _insert_txn(conn, "quickbooks", "QB-CAND-X", 1000.00, "2026-03-20",
+                canonical_id="CAN-X")
+    _insert_canonical(conn, "CAN-Y", "Cenlar PSA Co", entity_type="client")
+    _insert_canonical(conn, "CAN-X", "Cenlar Accounting Co", entity_type="client")
+
+    entity_x = _make_entity("Cenlar Accounting Co", source="quickbooks", source_id="QB-X")
+    entity_y = _make_entity("Cenlar PSA Co", source="ruddr", source_id="RUDDR-Y")
+
+    with _mock.patch("core.matching.scoring._base_weighted_score", return_value=0.80):
+        forward = score_pair(
+            entity=entity_x,
+            candidate_id="CAN-Y",
+            candidate_name="Cenlar PSA Co",
+            candidate_aliases=(),
+            candidate_category="psa",
+            conn=conn,
+        )
+        backward = score_pair(
+            entity=entity_y,
+            candidate_id="CAN-X",
+            candidate_name="Cenlar Accounting Co",
+            candidate_aliases=(),
+            candidate_category="accounting",
+            conn=conn,
+        )
+
+    b3_forward = next(e for e in forward.signal_breakdown.b_boosts if e.signal_id == "B3")
+    b3_backward = next(e for e in backward.signal_breakdown.b_boosts if e.signal_id == "B3")
+    assert b3_forward.raw == b3_backward.raw == 0.10
+
+
+def test_b3_credit_memo_amounts_cooccur(conn: sqlite3.Connection) -> None:
+    """(2) Credit memo: -1000.00 and 1000.00 co-occur (ABS semantics)."""
+    _insert_txn(conn, "quickbooks", "QB-CM", -1000.00, "2026-04-01",
+                counterparty_source_id="QB-CM-CUST")
+    _insert_txn(conn, "ruddr", "RUDDR-CM", 1000.00, "2026-04-10",
+                category="psa", canonical_id="CAN-CM")
+    count = count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-CM-CUST", "CAN-CM"
+    )
+    assert count == 1
+
+
+def test_b3_tolerance_boundary_percentage_bound(conn: sqlite3.Connection) -> None:
+    """(3) Tolerance boundary, percentage-bound side: delta exactly equal
+    to MAX(|a|,|b|)*0.02 fires; one cent over does not. The candidate
+    amount is kept <= the anchor amount so MAX(|a|,|b|) stays fixed at
+    1000.00 across both cases — otherwise a larger delta would also
+    inflate the tolerance itself."""
+    # 1000.00 * 0.02 == 20.00
+    _insert_txn(conn, "quickbooks", "QB-PCT-1", 1000.00, "2026-05-01",
+                counterparty_source_id="QB-PCT-CUST")
+    _insert_txn(conn, "ruddr", "RUDDR-PCT-1", 980.00, "2026-05-05",
+                category="psa", canonical_id="CAN-PCT-1")
+    assert count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-PCT-CUST", "CAN-PCT-1"
+    ) == 1
+
+    _insert_txn(conn, "quickbooks", "QB-PCT-2", 1000.00, "2026-06-01",
+                counterparty_source_id="QB-PCT-CUST-2")
+    _insert_txn(conn, "ruddr", "RUDDR-PCT-2", 979.99, "2026-06-05",
+                category="psa", canonical_id="CAN-PCT-2")
+    assert count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-PCT-CUST-2", "CAN-PCT-2"
+    ) == 0
+
+
+def test_b3_tolerance_boundary_dollar_cap_bound(conn: sqlite3.Connection) -> None:
+    """(3) Tolerance boundary, $500-cap side: at 100000.00 the percentage
+    bound (2000.00) exceeds the flat cap, so 500.00 exactly fires and
+    500.01 does not. The candidate amount stays <= the anchor so
+    MAX(|a|,|b|) is fixed at 100000.00 in both cases."""
+    _insert_txn(conn, "quickbooks", "QB-CAP-1", 100000.00, "2026-07-01",
+                counterparty_source_id="QB-CAP-CUST")
+    _insert_txn(conn, "ruddr", "RUDDR-CAP-1", 99500.00, "2026-07-05",
+                category="psa", canonical_id="CAN-CAP-1")
+    assert count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-CAP-CUST", "CAN-CAP-1"
+    ) == 1
+
+    _insert_txn(conn, "quickbooks", "QB-CAP-2", 100000.00, "2026-08-01",
+                counterparty_source_id="QB-CAP-CUST-2")
+    _insert_txn(conn, "ruddr", "RUDDR-CAP-2", 99499.99, "2026-08-05",
+                category="psa", canonical_id="CAN-CAP-2")
+    assert count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-CAP-CUST-2", "CAN-CAP-2"
+    ) == 0
+
+
+def test_b3_tiering_one_period_two_periods_and_multi_pair_dedup(
+    conn: sqlite3.Connection,
+) -> None:
+    """(4) Tiering: 1 distinct period -> raw +0.10 (via _compute_b_boosts);
+    2 distinct periods -> raw +0.15; a single period containing three
+    qualifying row pairs still counts once."""
+    # One period, three qualifying row pairs within it.
+    _insert_txn(conn, "quickbooks", "QB-T1", 500.00, "2026-01-10",
+                counterparty_source_id="QB-TIER-CUST")
+    _insert_txn(conn, "ruddr", "RUDDR-T1a", 500.00, "2026-01-05",
+                category="psa", canonical_id="CAN-TIER")
+    _insert_txn(conn, "ruddr", "RUDDR-T1b", 500.10, "2026-01-15",
+                category="psa", canonical_id="CAN-TIER")
+    _insert_txn(conn, "ruddr", "RUDDR-T1c", 499.90, "2026-01-20",
+                category="psa", canonical_id="CAN-TIER")
+    one_period_count = count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-TIER-CUST", "CAN-TIER"
+    )
+    assert one_period_count == 1
+    one_period_boosts = _compute_b_boosts(
+        conn=conn,
+        source_id=None,
+        candidate_id="CAN-TIER",
+        source_category="accounting",
+        candidate_category="psa",
+        source_external_fields={},
+        candidate_external_fields={},
+        base_score=0.80,
+        amount_cooccurrence_periods=one_period_count,
+    )
+    b3_one = next(e for e in one_period_boosts if e.signal_id == "B3")
+    assert b3_one.raw == 0.10
+
+    # A second, distinct period for the same pair.
+    _insert_txn(conn, "quickbooks", "QB-T2", 500.00, "2026-02-10",
+                counterparty_source_id="QB-TIER-CUST")
+    _insert_txn(conn, "ruddr", "RUDDR-T2", 500.00, "2026-02-15",
+                category="psa", canonical_id="CAN-TIER")
+    two_period_count = count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-TIER-CUST", "CAN-TIER"
+    )
+    assert two_period_count == 2
+    two_period_boosts = _compute_b_boosts(
+        conn=conn,
+        source_id=None,
+        candidate_id="CAN-TIER",
+        source_category="accounting",
+        candidate_category="psa",
+        source_external_fields={},
+        candidate_external_fields={},
+        base_score=0.80,
+        amount_cooccurrence_periods=two_period_count,
+    )
+    b3_two = next(e for e in two_period_boosts if e.signal_id == "B3")
+    assert b3_two.raw == 0.15
+
+
+def test_b3_cross_currency_never_cooccurs(conn: sqlite3.Connection) -> None:
+    """(5) Cross-currency: USD and EUR rows with identical amounts never
+    co-occur."""
+    _insert_txn(conn, "quickbooks", "QB-FX", 1000.00, "2026-09-01",
+                counterparty_source_id="QB-FX-CUST", currency="USD")
+    _insert_txn(conn, "ruddr", "RUDDR-FX", 1000.00, "2026-09-05",
+                category="psa", canonical_id="CAN-FX", currency="EUR")
+    assert count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-FX-CUST", "CAN-FX"
+    ) == 0
+
+
+def test_b3_same_source_never_cooccurs(conn: sqlite3.Connection) -> None:
+    """(6) Same-source: two quickbooks rows never co-occur with each
+    other."""
+    _insert_txn(conn, "quickbooks", "QB-SS-1", 1000.00, "2026-10-01",
+                counterparty_source_id="QB-SS-CUST")
+    _insert_txn(conn, "quickbooks", "QB-SS-2", 1000.00, "2026-10-05",
+                canonical_id="CAN-SS")
+    assert count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-SS-CUST", "CAN-SS"
+    ) == 0
+
+
+def test_b3_band_gate_no_entry_outside_ambiguous_band(conn: sqlite3.Connection) -> None:
+    """(7) Band gate: B3 produces no entry at base_score 0.65 or 0.92
+    even with perfect co-occurrence (amount_cooccurrence_periods=2)."""
+    for base in (0.65, 0.92):
+        result = _compute_b_boosts(
+            conn=conn,
+            source_id=None,
+            candidate_id="CAN-BAND",
+            source_category="accounting",
+            candidate_category="psa",
+            source_external_fields={},
+            candidate_external_fields={},
+            base_score=base,
+            amount_cooccurrence_periods=2,
+        )
+        assert result == ()
+
+
+def test_b3_cap_collision_five_signal_renormalization(conn: sqlite3.Connection) -> None:
+    """(8) Cap collision (NEW test): B1+B2+B3+B4+B5 with raw sum > 0.20
+    renormalizes proportionally: sum(applied) == 0.20 exactly, each
+    applied == raw * (0.20 / total_raw), all five entries present. The
+    shipped 4-signal cap test (test_b_boosts_total_applied_capped_at_max)
+    is untouched."""
+    import datetime
+    import unittest.mock as _mock
+
+    ts_base = datetime.datetime(2024, 1, 15)
+    ts_offset = datetime.datetime(2024, 1, 20)
+
+    with _mock.patch(
+        "core.matching.scoring.count_shared_person_neighbors", return_value=2
+    ), _mock.patch(
+        "core.matching.scoring.get_created_at", side_effect=[ts_base, ts_offset]
+    ), _mock.patch(
+        "core.matching.scoring.count_shared_graph_neighbors", return_value=0
+    ):
+        result = _compute_b_boosts(
+            conn=conn,
+            source_id="CAN-SRC5",
+            candidate_id="CAN-CAND5",
+            source_category="accounting",
+            candidate_category="psa",
+            source_external_fields={
+                "class": "GENAI-SOW3",
+                "memo": "GENAI Q4",
+                "email": "alice@acmecorp.com",
+            },
+            candidate_external_fields={
+                "project_codes": ["CEN-GENAI-SOW3", "CEN-GENAI"],
+                "email": "bob@acmecorp.com",
+            },
+            base_score=0.80,
+            amount_cooccurrence_periods=1,
+        )
+
+    assert len(result) == 5, f"expected B1+B2+B3+B4+B5, got {result}"
+    signal_ids = {e.signal_id for e in result}
+    assert signal_ids == {"B1", "B2", "B3", "B4", "B5"}
+    raw_by_signal = {e.signal_id: e.raw for e in result}
+    total_raw = sum(raw_by_signal.values())
+    assert total_raw > MAX_B_BOOST
+    total_applied = sum(e.applied for e in result)
+    assert math.isclose(total_applied, MAX_B_BOOST, abs_tol=1e-9)
+    for e in result:
+        expected_applied = e.raw * (MAX_B_BOOST / total_raw)
+        assert math.isclose(e.applied, expected_applied, rel_tol=1e-9)
+
+
+def test_b3_period_derivation_and_mismatched_period_contributes_nothing(
+    conn: sqlite3.Connection,
+) -> None:
+    """(9) Period derivation: a seeded row with txn_date='2026-03-15'
+    carries period='2026-03'; the helper contributes 0 for a row whose
+    period disagrees with its txn_date month."""
+    _insert_txn(conn, "quickbooks", "QB-PERIOD", 250.00, "2026-03-15",
+                counterparty_source_id="QB-PERIOD-CUST")
+    row = conn.execute(
+        "SELECT period FROM transactions WHERE external_source_id = ?",
+        ("QB-PERIOD",),
+    ).fetchone()
+    assert row[0] == "2026-03"
+
+    # Candidate row's stored period disagrees with its own txn_date month
+    # (simulates a load-time-derived period bug) — must not co-occur.
+    _insert_txn(conn, "ruddr", "RUDDR-PERIOD-BUG", 250.00, "2026-03-20",
+                category="psa", canonical_id="CAN-PERIOD-BUG", period="2026-04")
+    assert count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-PERIOD-CUST", "CAN-PERIOD-BUG"
+    ) == 0
+
+
+def test_b3_tenant_scoping(conn: sqlite3.Connection) -> None:
+    """(10) Tenant scoping: rows under a different tenant_id are
+    invisible to the helper when tenant_id is set."""
+    _insert_txn(conn, "quickbooks", "QB-TEN", 750.00, "2026-11-01",
+                counterparty_source_id="QB-TEN-CUST", tenant_id="TENANT_A")
+    _insert_txn(conn, "ruddr", "RUDDR-TEN", 750.00, "2026-11-05",
+                category="psa", canonical_id="CAN-TEN", tenant_id="TENANT_A")
+    assert count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-TEN-CUST", "CAN-TEN", tenant_id="TENANT_A"
+    ) == 1
+    assert count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-TEN-CUST", "CAN-TEN", tenant_id="TENANT_B"
+    ) == 0
+
+
+def test_b3_dark_by_default_proven_in_process(conn: sqlite3.Connection) -> None:
+    """(11) Dark by default, proven in-process: with an empty
+    transactions table, (a) the helper returns 0, (b) no BoostEntry with
+    signal_id=='B3' appears, and (c) the score is bit-identical between
+    the pre-8b path (amount_cooccurrence_periods=None) and the 8b path
+    with zero evidence (amount_cooccurrence_periods=0) — computed both
+    sides in-process, exact `==`, no baseline fixture."""
+    assert count_amount_cooccurrence_periods(
+        conn, "quickbooks", "QB-DARK-CUST", "CAN-DARK"
+    ) == 0
+
+    import datetime
+    import unittest.mock as _mock
+
+    ts_base = datetime.datetime(2024, 1, 15)
+    ts_offset = datetime.datetime(2024, 1, 20)
+
+    common_kwargs = dict(
+        conn=conn,
+        source_id="CAN-SRC-DARK",
+        candidate_id="CAN-DARK",
+        source_category="accounting",
+        candidate_category="psa",
+        source_external_fields={
+            "class": "GENAI-SOW3",
+            "email": "alice@acmecorp.com",
+        },
+        candidate_external_fields={
+            "project_codes": ["CEN-GENAI-SOW3"],
+            "email": "bob@acmecorp.com",
+        },
+        base_score=0.80,
+    )
+
+    with _mock.patch(
+        "core.matching.scoring.count_shared_person_neighbors", return_value=1
+    ), _mock.patch(
+        "core.matching.scoring.get_created_at", side_effect=[ts_base, ts_offset, ts_base, ts_offset]
+    ), _mock.patch(
+        "core.matching.scoring.count_shared_graph_neighbors", return_value=0
+    ):
+        boosts_disabled = _compute_b_boosts(
+            **common_kwargs, amount_cooccurrence_periods=None
+        )
+        boosts_enabled = _compute_b_boosts(
+            **common_kwargs, amount_cooccurrence_periods=0
+        )
+
+    assert all(e.signal_id != "B3" for e in boosts_disabled)
+    assert all(e.signal_id != "B3" for e in boosts_enabled)
+    assert len(boosts_disabled) == len(boosts_enabled)
+    for a, b in zip(boosts_disabled, boosts_enabled):
+        assert a.signal_id == b.signal_id
+        assert a.raw == b.raw
+        assert a.applied == b.applied
+
+    assert _weighted_score(0.80, boosts_disabled) == _weighted_score(0.80, boosts_enabled)
+
+
+def test_b3_skips_entirely_when_periods_is_none(conn: sqlite3.Connection) -> None:
+    """`_compute_b_boosts(..., amount_cooccurrence_periods=None)` skips
+    B3 entirely, regardless of DB state — the parameter, not a DB query,
+    gates B3 inside the function."""
+    _insert_txn(conn, "quickbooks", "QB-SKIP", 500.00, "2026-12-01",
+                counterparty_source_id="QB-SKIP-CUST")
+    _insert_txn(conn, "ruddr", "RUDDR-SKIP", 500.00, "2026-12-05",
+                category="psa", canonical_id="CAN-SKIP")
+    result = _compute_b_boosts(
+        conn=conn,
+        source_id=None,
+        candidate_id="CAN-SKIP",
+        source_category="accounting",
+        candidate_category="psa",
+        source_external_fields={},
+        candidate_external_fields={},
+        base_score=0.80,
+        amount_cooccurrence_periods=None,
+    )
+    assert all(e.signal_id != "B3" for e in result)
+
+
+def test_b3_fires_on_unresolved_source_path(conn: sqlite3.Connection) -> None:
+    """(12) Unresolved-source path: B3 fires for a pair whose source
+    entity has source_canonical_id is None, proving the join keys do
+    not require resolution."""
+    import unittest.mock as _mock
+
+    _insert_txn(conn, "quickbooks", "QB-UNRES", 1200.00, "2026-02-01",
+                counterparty_source_id="QB-UNRES-CUST")
+    _insert_txn(conn, "ruddr", "RUDDR-UNRES", 1200.00, "2026-02-05",
+                category="psa", canonical_id="CAN-UNRES")
+    _insert_canonical(conn, "CAN-UNRES", "Cenlar Unresolved Co", entity_type="client")
+
+    entity = _make_entity(
+        "Cenlar Unresolved Co", source="quickbooks", source_id="QB-UNRES-CUST"
+    )
+
+    with _mock.patch("core.matching.scoring._base_weighted_score", return_value=0.80):
+        result = score_pair(
+            entity=entity,
+            candidate_id="CAN-UNRES",
+            candidate_name="Cenlar Unresolved Co",
+            candidate_aliases=(),
+            candidate_category="psa",
+            conn=conn,
+            source_canonical_id=None,
+        )
+
+    b3 = next((e for e in result.signal_breakdown.b_boosts if e.signal_id == "B3"), None)
+    assert b3 is not None
+    assert b3.raw == 0.10
+
+
+def test_score_pair_invokes_amount_cooccurrence_helper_at_most_once(
+    conn: sqlite3.Connection,
+) -> None:
+    """score_pair invokes count_amount_cooccurrence_periods at most once
+    per pair and only when in_b_band."""
+    import unittest.mock as _mock
+
+    entity = _make_entity("Acme Corp", source="quickbooks", source_id="QB-CALLCOUNT")
+
+    with _mock.patch(
+        "core.matching.scoring.count_amount_cooccurrence_periods", return_value=0
+    ) as mocked, _mock.patch(
+        "core.matching.scoring._base_weighted_score", return_value=0.30
+    ):
+        score_pair(
+            entity=entity,
+            candidate_id="CAN-CALLCOUNT",
+            candidate_name="Completely Unrelated Candidate",
+            candidate_aliases=(),
+            candidate_category="psa",
+            conn=conn,
+        )
+    mocked.assert_not_called()
+
+    with _mock.patch(
+        "core.matching.scoring.count_amount_cooccurrence_periods", return_value=1
+    ) as mocked, _mock.patch(
+        "core.matching.scoring._base_weighted_score", return_value=0.80
+    ):
+        score_pair(
+            entity=entity,
+            candidate_id="CAN-CALLCOUNT",
+            candidate_name="Completely Unrelated Candidate",
+            candidate_aliases=(),
+            candidate_category="psa",
+            conn=conn,
+        )
+    mocked.assert_called_once()

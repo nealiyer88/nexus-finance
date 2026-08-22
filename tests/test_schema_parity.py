@@ -1,6 +1,6 @@
 """Schema parity test.
 
-Asserts that the four shared tables in db/schema.sql (Postgres) and
+Asserts that the shared tables in db/schema.sql (Postgres) and
 db/schema_sqlite.sql (SQLite, V1 dormant) declare the same column names.
 Types are allowed to differ (UUID/JSONB on Postgres vs. TEXT on SQLite).
 
@@ -9,6 +9,7 @@ Tables checked:
   - entity_aliases
   - entity_edges
   - system_references
+  - transactions
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ SHARED_TABLES = [
     "entity_aliases",
     "entity_edges",
     "system_references",
+    "transactions",
 ]
 
 # Tokens that begin a non-column constraint clause inside CREATE TABLE.
@@ -48,6 +50,7 @@ EXCLUDE: dict[str, set[str]] = {
     "entity_aliases": set(),
     "entity_edges": set(),
     "system_references": {"tenant_id"},
+    "transactions": {"tenant_id"},
 }
 
 

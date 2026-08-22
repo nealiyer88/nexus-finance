@@ -56,3 +56,25 @@ CREATE TABLE IF NOT EXISTS system_references (
     UNIQUE (source, external_id)
 );
 CREATE INDEX IF NOT EXISTS system_references_canonical ON system_references (canonical_id);
+
+-- Transactions (backs Signal B3 — amount co-occurrence). tenant_id is
+-- nullable TEXT here, mirroring the canonical_entities single-tenant V1
+-- pattern; Postgres declares it UUID NOT NULL REFERENCES tenants(id).
+CREATE TABLE IF NOT EXISTS transactions (
+    txn_id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id              TEXT,
+    source                 TEXT NOT NULL,
+    category               TEXT NOT NULL,
+    external_source_id     TEXT NOT NULL,
+    txn_type               TEXT NOT NULL,
+    amount                 REAL NOT NULL,
+    currency               TEXT NOT NULL DEFAULT 'USD',
+    txn_date               TEXT NOT NULL,
+    period                 TEXT NOT NULL,
+    counterparty_source_id TEXT,
+    canonical_id           TEXT REFERENCES canonical_entities(canonical_id),
+    created_at             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (tenant_id, source, external_source_id)
+);
+CREATE INDEX IF NOT EXISTS transactions_counterparty ON transactions (tenant_id, source, counterparty_source_id, period);
+CREATE INDEX IF NOT EXISTS transactions_canonical    ON transactions (tenant_id, canonical_id, period);
