@@ -302,3 +302,5 @@
 | 2026-08-23T00:40:47 | 12 | qb-validation | — | SKIPPED (QB gate off / no QB keywords) |
 | 2026-08-23T00:40:47 | 12 | exercise-gate | hook | SKIPPED (no project exercise script) |
 | 2026-08-23T00:40:51 | 12 | gates:post-integration | — | PASS (features/_logs/12-gates-post-integration.md) |
+| 2026-08-23T00:40:51 | 12 | feature-cost | — | $9.5849 / $50 |
+| 2026-08-23T00:40:51 | 12 | SHIPPED | rocket | complete |

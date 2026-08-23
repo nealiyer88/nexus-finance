@@ -1,7 +1,7 @@
 # Feature Brief: Postgres Store Bootstrap — Driver, Migration Runner, Test Tier, Approval + Audit Writes
 
 **Author:** Neal Iyer
-**Date:** 2026-08-23 (revised after the 2026-08-22 reality check; hosted-database decision applied)
+**Date:** 2026-08-23 (revised after the 2026-08-22 reality check; database target restated as environment-supplied)
 **Status:** Approved
 **Complexity:** L
 **FP&A Phase:** 1 (Entity Resolution)
@@ -21,22 +21,23 @@ This feature stands up that path once, correctly, so every later feature inherit
 
 ## The database target — decided, not to be re-litigated
 
-**Postgres for this repo is a hosted Supabase project. It is not local, and there is no Docker.** Everything below follows from that:
+**Postgres for this repo is whatever `DATABASE_URL` points at, and nothing in this feature is allowed to care which server that is.** The developer environment and the eventual deployment target may be different servers; both are reached identically, through that one variable. Everything below follows from that:
 
 - **Postgres major version is 17.** Any version-conditional reasoning uses 17. **Do not pin a patch version anywhere** — not in the brief, not in a comment, not in a test. `gen_random_uuid()` is used by shipped migrations with no `CREATE EXTENSION pgcrypto`; that is a built-in on the major version in use, so no extension step is required. State the requirement as a **minimum major version**, never as an exact release.
-- **No local database tooling exists on the build machine and none is to be assumed.** Do not write, run, or document `docker run`, `docker compose`, `initdb`, `pg_ctl`, `brew install postgresql`, Postgres.app, `testcontainers`, or a bare `psql` invocation. Any instruction that only works against `localhost` is out of scope. If the build wants to execute SQL, it does so through the pinned driver against `DATABASE_URL`.
-- **The connection contract is `DATABASE_URL` from the environment, and its absence means "Postgres not available" — never an error.** The developer supplies the real value in a gitignored `.env` at the repo root. `.env` is already ignored; only `.env.example` is committed. Never invent a default DSN, never fall back to `localhost`, never construct a DSN from parts.
+- **The target is supplied entirely by the environment, and nothing may be hardcoded.** No module, test, comment, fixture, docstring, printed line, or sentence of this brief may contain a host, a port, a database name, or a username; may build a DSN out of parts; may assume the DSN carries a password component; or may assume the server does or does not live on the same machine as the build. Anything that would have to change when the DSN changes is a defect.
+- **Provisioning is not this feature's business.** Do not write, run, or document any command that installs, initialises, starts, containerises, or tears down a database server, and do not add a CI service container. Whether a server already exists, and where, is the developer's environment, not this feature's contract. If the build wants to execute SQL, it does so through the pinned driver against `DATABASE_URL` and through nothing else.
+- **The connection contract is `DATABASE_URL` from the environment, and its absence means "Postgres not available" — never an error.** The developer supplies the real value in a gitignored `.env` at the repo root. `.env` is already ignored; only `.env.example` is committed. Never invent a default DSN, never fall back to any built-in target, never construct a DSN from parts.
 - **`.env` loading reuses whatever loader the repo already has.** Derive it at build time: grep the tree for an existing `load_dotenv` call and copy that module's convention — in this repo it is a **lazy, guarded import inside the function that needs it**, so the loader is never a hard import-time dependency and the module stays importable with the package absent. Do not add a new loader, do not add a `requirements.txt` line for one, and do not import `dotenv` at module top level.
-- **This database is reachable over the network, not over loopback.** Every connection this feature opens must carry an **explicit connect timeout**, and no code, comment, or test may assume localhost latency (no "instant", no retry-free tight loop, no sub-second assumption baked into a test). **This brief pins no timeout value.** At build time, grep the tree for an existing outbound-client timeout convention and adopt it if one exists; if the grep finds none, the builder chooses the value and defines it as a single UPPER_CASE module-level constant in `core/graph/pg.py`, overridable by an environment variable. The value is never an inline literal at a call site.
+- **Every connection this feature opens must carry an explicit connect timeout.** The rationale does not depend on where the server is: a connect with no timeout can hang the caller — the migration runner, a test, or Stage 6 — indefinitely, and an unbounded wait is a defect on any target. Correspondingly, no code, comment, or test may bake in an assumption about how fast a connect or a query returns (no "instant", no retry-free tight loop, no sub-second assumption baked into a test), because the same code runs against targets of very different latencies. **This brief pins no timeout value.** At build time, grep the tree for an existing outbound-client timeout convention and adopt it if one exists; if the grep finds none, the builder chooses the value and defines it as a single UPPER_CASE module-level constant in `core/graph/pg.py`, overridable by an environment variable. The value is never an inline literal at a call site.
 
 ### SECRET HANDLING — hard requirement
 
-`DATABASE_URL` is a live credential. Therefore, without exception:
+`DATABASE_URL` is treated as a live credential at all times, **whether or not the current value happens to carry a password** — a deployment DSN will, the value in a developer's `.env` may not, and no code path is permitted to branch on which. Therefore, without exception:
 
 - It is **never logged** — not at any level, not in debug output, not in a `print`.
 - It is **never echoed in an error message**. `connect()` may name the *variable* `DATABASE_URL`; it may never include its *value*, and no exception this feature raises or re-raises may carry the DSN in its message. Driver exceptions that embed connection parameters must be caught and re-raised with a scrubbed message.
 - It is **never written to any file under `features/` or `.rocket/`**, and never into a fixture, a snapshot, a log, a migration file, or a committed config. Only `.env` (gitignored) holds it; only `.env.example` (committed) holds a placeholder.
-- The real host, database name, user, and password appear **nowhere in this brief** by design — the brief names the variable, never the value.
+- The DSN and **every component it may carry** appear **nowhere in this brief** by design — the brief names the variable, never the value, and never states which components a given value has.
 
 ---
 
@@ -63,10 +64,10 @@ This feature **edits `core/graph/resolution.py`, which is feature 10's shipped f
 
 - **Driver dependency.** Add a single pinned Postgres driver to `requirements.txt`: `psycopg[binary]==<pin>`. Confirm at build time by grep that no other Postgres driver is already pinned. The binary wheel is chosen so no local `libpq` or C toolchain is required on Apple-Silicon dev machines or CI.
 
-- **`.env.example` gains `DATABASE_URL`.** A committed line with a **clearly fake placeholder** value — an obviously non-real project reference and an obviously non-real password, in the same commented-section style the file already uses. The placeholder must be unmistakably a placeholder: it may not resolve to any real host and may not be a syntactically-plausible live credential. `.env` itself is already gitignored and is never created, read into, or referenced by a committed file other than as this placeholder.
+- **`.env.example` gains `DATABASE_URL`.** A committed line with a **clearly fake placeholder** value, in the same commented-section style the file already uses. The placeholder must be unmistakably a placeholder: every component it carries is obviously synthetic, it may not resolve to any real server, and it may not read as a syntactically-plausible live credential. It is an illustration of the variable's shape, not of any environment's actual target. `.env` itself is already gitignored and is never created, read into, or referenced by a committed file other than as this placeholder.
 
 - **Connection configuration.** `core/graph/pg.py`, a single small module:
-  - `get_dsn() -> str | None` — reads `DATABASE_URL` from the environment, loading `.env` first via the repo's existing lazy-guarded loader convention. Returns `None` when unset. **Never raises, never invents a default, never falls back to localhost.**
+  - `get_dsn() -> str | None` — reads `DATABASE_URL` from the environment, loading `.env` first via the repo's existing lazy-guarded loader convention. Returns `None` when unset. **Never raises, never invents a default, never falls back to any built-in target.**
   - `connect() -> psycopg.Connection` — opens a connection carrying the explicit connect timeout described above. Raises a clear `RuntimeError` **naming the variable `DATABASE_URL`** when the DSN is absent; the message never contains the DSN value.
   - `is_available() -> bool` — the single availability helper. Used by test skip guards **and by feature 10's Stage 6 call site**, which reaches Postgres through nothing else.
   - `BOOTSTRAP_TENANT_ID` — see Tenant provisioning.
@@ -91,7 +92,7 @@ This feature **edits `core/graph/resolution.py`, which is feature 10's shipped f
 
   - Creates `schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())` **before** applying anything.
   - **Skips any file already recorded.** A file is applied at most once, ever.
-  - **DESTRUCTIVE-FILE GUARD (defect fix — see below).** Before applying `001_canonical_schema.sql`, the runner checks whether `canonical_entities` already exists while `schema_migrations` has no row for `001`. If so it **refuses to run**, exits non-zero, and prints the reason. This is the case where a database was created some other way and re-running 001 would silently destroy it. **On a hosted, shared database this guard is the primary safety mechanism** — there is no throwaway local container to fall back on.
+  - **DESTRUCTIVE-FILE GUARD (defect fix — see below).** Before applying `001_canonical_schema.sql`, the runner checks whether `canonical_entities` already exists while `schema_migrations` has no row for `001`. If so it **refuses to run**, exits non-zero, and prints the reason. This is the case where a database was created some other way and re-running 001 would silently destroy it. **This guard is the primary safety mechanism** — the runner must assume the database it is pointed at holds data someone cares about, and must never rely on the target being disposable.
   - Prints one line per file (`applied` / `skipped`) and exits 0 on success. **No printed line may contain the DSN**, in any code path including the failure paths.
   - `--dry-run` prints the plan and applies nothing.
 
@@ -105,7 +106,7 @@ This feature **edits `core/graph/resolution.py`, which is feature 10's shipped f
 
   **Resolution chosen: the runner never re-runs an applied file, and the shipped migrations are left byte-unchanged.** Idempotency is redefined at the **runner** level and stated that way in every criterion: *a second `migrate_pg.py` run applies zero files and exits 0.* It is explicitly **not** claimed that re-executing any shipped migration is safe. The shipped migrations are not rewritten because reworking a `DROP` block is a schema-authoring change that belongs to the owning schema feature, not to a bootstrap feature.
 
-  **DATA-LOSS HAZARD — flag prominently in `scripts/migrate_pg.py`'s module docstring:** running any destructive migration by hand against the hosted database, or deleting its `schema_migrations` row and re-running the runner, **destroys all data in the tables that migration drops**. This is a shared hosted project, so there is no local-container escape hatch and no automatic snapshot to assume. The docstring must **name every migration file containing an unconditional `DROP TABLE`**, and that list is produced at build time by `grep -lE '^DROP TABLE' db/migrations/*.sql` (excluding `*_sqlite.sql`) — **no hardcoded list may be copied out of this brief**.
+  **DATA-LOSS HAZARD — flag prominently in `scripts/migrate_pg.py`'s module docstring:** running any destructive migration by hand against the configured database, or deleting its `schema_migrations` row and re-running the runner, **destroys all data in the tables that migration drops**. Assume no escape hatch and no automatic snapshot on whatever target `DATABASE_URL` names. The docstring must **name every migration file containing an unconditional `DROP TABLE`**, and that list is produced at build time by `grep -lE '^DROP TABLE' db/migrations/*.sql` (excluding `*_sqlite.sql`) — **no hardcoded list may be copied out of this brief**.
 
 - **Marker registration — `pytest.ini` at repo root (NEW).** Derive at build time that the repo has no pytest configuration of any kind, then create one. The consequence a dry run measured: an unregistered `@pytest.mark.integration` makes pytest emit a warning rather than an error, `-m integration` **deselects everything**, and the run **exits 0 with a zero-test selection**. That is the dangerous outcome — not a loud failure but a silent pass. Any criterion phrased as "the integration suite passes" or "the integration run exits 0" is therefore false signal. Every criterion in this brief that touches the integration tier asserts a **collected count greater than zero**; a bare exit code is never sufficient on its own. This feature creates:
 
@@ -126,7 +127,7 @@ This feature **edits `core/graph/resolution.py`, which is feature 10's shipped f
   - **NULL-tenant fallback, stated explicitly rather than implied.** Feature 10's `resolve_match` carries `tenant_id: Optional[str] = None` and SQLite fixtures load NULL, while the Postgres columns are `NOT NULL REFERENCES tenants(id)`. Every writer in this feature therefore **falls back to `BOOTSTRAP_TENANT_ID` when the caller's `tenant_id` is `None`**, and calls `resolve_or_create_tenant` before inserting when it is not. Without this fallback the default path FK-fails on every write.
   - **Downstream contract:** feature 16's `DEFAULT_TENANT_ID` is bound to `BOOTSTRAP_TENANT_ID` by import (`DEFAULT_TENANT_ID = BOOTSTRAP_TENANT_ID`), asserted by **identity** on 16's side, and feature 16 may assume the row exists after `migrate_pg.py` has run. Nothing in this feature may make `BOOTSTRAP_TENANT_ID` require a database to import, rename it, or turn it into a computed value — all three would break that seam. Feature 16 does not create tenants.
 
-- **`tests/conftest.py` (NEW):** a `pg_conn` fixture that `pytest.skip`s with an explicit reason when `core.graph.pg.is_available()` is `False`, yields a connection wrapped in a transaction, and rolls back at teardown so integration tests leave no residue. **Rollback-at-teardown is mandatory, not hygienic** — this is a shared hosted project, not a disposable container, and a test that commits pollutes it for everyone. The skip reason names the variable `DATABASE_URL` and never its value.
+- **`tests/conftest.py` (NEW):** a `pg_conn` fixture that `pytest.skip`s with an explicit reason when `core.graph.pg.is_available()` is `False`, yields a connection wrapped in a transaction, and rolls back at teardown so integration tests leave no residue. **Rollback-at-teardown is mandatory, not hygienic** — the target is never assumed to be disposable, and a test that commits pollutes whatever database the developer or CI pointed at. The skip reason names the variable `DATABASE_URL` and never its value.
 
 - **Writers.**
   - `core/graph/audit.py` — `log_resolution(conn, canonical_id, incoming_entity_raw, match_type, confidence, signals, category_pair, user_id, tenant_id)`. **INSERT-only** into `audit_log`, one row per resolution decision. The module contains no UPDATE and no DELETE path. V1 append-only is enforced **in code**: `db/schema.sql`'s "append-only" line is a SQL comment, not a trigger, `REVOKE`, or `RULE`.
@@ -141,8 +142,8 @@ This feature **edits `core/graph/resolution.py`, which is feature 10's shipped f
     Note that feature 10b's SQLite pending-decisions table deliberately reuses this same terminal vocabulary for its `status` column, so no translation layer is needed if a later feature back-fills pending rows into `approval_decisions`. **This feature builds no such back-fill** and makes no edit to 10b's module, migration, or tests.
   - Both are called from feature 10's shipped resolution module (see the cross-feature ownership note) **behind the availability helper**: when `DATABASE_URL` is unset the calls are no-ops and Stage 6 continues on SQLite exactly as it does today.
 
-- **Split-store risk, owned here.** With this feature live, Stage 6 reads and mutates the graph in **SQLite** and writes approval/audit records to **hosted Postgres** — two engines, no shared transaction, and now a **network hop** between them. A crash or a timeout between them can leave an approved alias with no audit row.
-  - **Ordering:** write the Postgres audit row **first**, then the SQLite graph mutation. The failure mode becomes an audit row for a resolution that did not land (detectable and re-drivable) rather than a graph mutation with no record (undetectable). Because the Postgres write is now a network call, a connect timeout on that write must fail **before** the SQLite mutation, preserving the ordering guarantee rather than silently skipping it.
+- **Split-store risk, owned here.** With this feature live, Stage 6 reads and mutates the graph in **SQLite** and writes approval/audit records to **Postgres** — two engines, no shared transaction, and a separate connection that can fail or time out independently. A crash or a timeout between them can leave an approved alias with no audit row.
+  - **Ordering:** write the Postgres audit row **first**, then the SQLite graph mutation. The failure mode becomes an audit row for a resolution that did not land (detectable and re-drivable) rather than a graph mutation with no record (undetectable). Because the Postgres write can time out, a connect timeout on that write must fail **before** the SQLite mutation, preserving the ordering guarantee rather than silently skipping it.
   - **Re-drive safety:** feature 10 already makes `resolve_match` idempotent on `(canonical_id, value, source)` and on `(source_node, target_node, relationship)`, so re-driving is safe.
   - **Reconciliation — `scripts/reconcile_stores.py`. DEFECT FIX: the invariant is coverage, not count equality.** An earlier draft compared SQLite alias/edge row counts against Postgres `audit_log` row counts for equality. That is **false by construction and must not be built**: one resolution decision writes one audit row but multiple graph rows (and may write none on a repeat, since both writes are idempotent upserts). Counts diverge on a perfectly healthy system.
 
@@ -159,7 +160,7 @@ This feature **edits `core/graph/resolution.py`, which is feature 10's shipped f
 ### Out of Scope
 
 - **Migrating the graph store to Postgres.** Every table in `db/schema_sqlite.sql` keeps its reads and writes on SQLite. Do not assert a table count for it; derive the list by grepping its `CREATE TABLE` statements. This feature adds a *second* store for approval + audit records only.
-- **Any local-database story.** No Docker, no `docker compose`, no `testcontainers`, no `initdb`, no local `psql`, no CI service container. The hosted project is the only target.
+- **Any database-provisioning story.** No Docker, no `docker compose`, no `testcontainers`, no `initdb`, no server-install or server-start instructions, no CI service container. `DATABASE_URL` names the only target this feature knows about; standing that target up is out of scope in both directions.
 - **Mirroring feature 10b's pending-decisions table into Postgres**, and any edit to 10b's module, migration, tests, or to `tests/test_schema_parity.py`'s shared-table literal.
 - **Rewriting any shipped migration** to remove its `DROP TABLE ... CASCADE` block.
 - **Widening `audit_log.actor_id`** or any other `db/schema.sql` type change.
@@ -167,7 +168,7 @@ This feature **edits `core/graph/resolution.py`, which is feature 10's shipped f
 - **Database-enforced append-only** on `audit_log` (trigger / `REVOKE` / `RULE`). V1 enforcement is code-level.
 - **Row-level security.** No `CREATE POLICY` exists anywhere. Writes carry `tenant_id` as a value.
 - **Connection pooling, ORM, async.** One driver, one `connect()`.
-- **Supabase auth, the Supabase client library, and the Supabase SDK generally.** This feature uses the hosted project purely as a Postgres endpoint over `DATABASE_URL`. `supabase==2.9.0` stays unimported.
+- **Any vendor SDK or auth layer in front of the database.** This feature speaks to a plain Postgres endpoint over `DATABASE_URL` through the pinned driver and nothing else; `supabase==2.9.0` stays unimported whatever the target turns out to be.
 - **A producer for the unmapped `disposition` CHECK value.**
 - The audit *middleware* and audit *dashboard page* — feature 16.
 
@@ -194,17 +195,17 @@ This feature **edits `core/graph/resolution.py`, which is feature 10's shipped f
 **Driver + connection (no database required):**
 
 - [ ] The `requirements.txt` diff adds a Postgres driver pin matching `^psycopg\[binary\]==` and **removes no line** — asserted as: the added-line set is non-empty and every added line matches that pattern, and the removed-line set is empty. `.venv/bin/python -c "import psycopg"` succeeds after `pip install -r requirements.txt`. A grep for any second Postgres driver pin in `requirements.txt` matches nothing.
-- [ ] `.env.example` contains a `DATABASE_URL=` line whose value is a placeholder: a test asserts it does not parse as a usable credential and that its host and password components are obviously synthetic. `.env` remains gitignored and untracked (`git check-ignore .env` succeeds; `git ls-files .env` returns nothing).
+- [ ] `.env.example` contains a `DATABASE_URL=` line whose value is a placeholder: a test asserts it does not parse as a usable credential and that every component it carries is obviously synthetic. The test asserts nothing about which components are present. `.env` remains gitignored and untracked (`git check-ignore .env` succeeds; `git ls-files .env` returns nothing).
 - [ ] With `DATABASE_URL` unset: `core.graph.pg.get_dsn()` returns `None`, `is_available()` returns `False`, and `connect()` raises `RuntimeError` whose message contains the literal string `DATABASE_URL` and **does not** contain any DSN value.
 - [ ] **Connect timeout is present and named:** a grep asserts `connect()` passes an explicit connect-timeout argument, that its value is a module-level UPPER_CASE constant in `core/graph/pg.py`, and that no inline numeric literal appears at the call site. No timeout value is asserted — only that one is set from a named constant.
 
 **Secret hygiene (no database required):**
 
 - [ ] **The DSN never reaches logs or errors:** a grep over `core/graph/pg.py`, `core/graph/audit.py`, `core/graph/approvals.py`, `core/graph/tenants.py`, `scripts/migrate_pg.py`, and `scripts/reconcile_stores.py` finds no path that logs, prints, or formats `get_dsn()`'s return value or the raw environment value into a message. A unit test monkeypatches `DATABASE_URL` to a sentinel string, exercises every failure path reachable without a database (missing DSN, malformed DSN, connect failure), captures stdout/stderr and the exception messages, and asserts the sentinel appears in none of them.
-- [ ] **The secret is not in the diff or in test output:** a check reads `DATABASE_URL` from the environment at run time, extracts its host and password components, and asserts neither appears in this feature's full commit diff, in any file under `features/` or `.rocket/`, or in the captured output of this feature's test runs. The check holds the secret only in memory and writes it nowhere. When `DATABASE_URL` is unset the check runs against the sentinel and still asserts absence.
+- [ ] **The secret is not in the diff or in test output:** a check reads `DATABASE_URL` from the environment at run time and asserts that the whole value, and each of the non-empty components it happens to carry, appears nowhere in this feature's full commit diff, in any file under `features/` or `.rocket/`, or in the captured output of this feature's test runs. Components the value does not carry are simply skipped — the check never requires a particular component to be present. The check holds the secret only in memory and writes it nowhere. When `DATABASE_URL` is unset the check runs against the sentinel and still asserts absence.
 - [ ] `grep -rn 'DATABASE_URL=' -- features/ .rocket/` finds no line carrying a value; the only committed assignment with a value is the placeholder in `.env.example`.
 
-**Migration runner (requires the hosted database):**
+**Migration runner (requires a reachable Postgres via `DATABASE_URL`):**
 
 - [ ] Against the configured database, `.venv/bin/python scripts/migrate_pg.py` exits 0 with `DATABASE_URL` set, and `SELECT to_regclass('public.approval_decisions')` and `SELECT to_regclass('public.audit_log')` both return non-NULL.
 - [ ] **`schema_migrations` equals the manifest, derived at runtime — no hardcoded total.** The test parses `db/migrations/postgres.manifest` (stripping blanks and `#` comments) into a list and asserts `SELECT filename FROM schema_migrations ORDER BY applied_at` returns that same list in that same order and nothing else: `assert rows == manifest_entries`.
@@ -219,7 +220,7 @@ This feature **edits `core/graph/resolution.py`, which is feature 10's shipped f
 - [ ] `scripts/migrate_pg.py`'s module docstring contains the literal words `DROP TABLE` and `data loss` — grep-asserted.
 - [ ] **The docstring names every destructive migration, derived not hardcoded:** a no-database test computes the set of files under `db/migrations/` (excluding `*_sqlite.sql`) matching `^DROP TABLE`, and asserts every filename in that set appears verbatim in the module docstring.
 
-**Tenant provisioning (requires the hosted database):**
+**Tenant provisioning (requires a reachable Postgres via `DATABASE_URL`):**
 
 - [ ] After `migrate_pg.py` completes, `SELECT COUNT(*) FROM tenants WHERE id = <BOOTSTRAP_TENANT_ID>` returns a row, and the seeded value is byte-identical to `core.graph.pg.BOOTSTRAP_TENANT_ID` (asserted in the test, not eyeballed).
 - [ ] **A dependent insert referencing it succeeds:** an `audit_log` insert using `core.graph.pg.BOOTSTRAP_TENANT_ID` commits without an FK error, and the same row shape with a random unseeded UUID raises a `ForeignKeyViolation`.
@@ -248,7 +249,7 @@ This feature **edits `core/graph/resolution.py`, which is feature 10's shipped f
 - [ ] **Feature 2 (canonical-schema) — SHIPPED**, in the narrow sense that it authored `db/schema.sql` and `db/migrations/001_canonical_schema.sql`. **Those files have never been executed** — per rules §0 they are `[PLANNED]`. This feature is the first to run them. Feature 2 remains the owner of any type change to `db/schema.sql`.
 - [ ] **Feature 10 (resolution-graph-update) — SHIPPED.** It ships the Stage 6 call site, the terminal disposition vocabulary, and the decision payloads. This feature edits that module and retires a named subset of that suite's guards — see the cross-feature ownership note.
 - [ ] **Feature 10b (pending-decision-persistence) — SHIPPED.** It added a SQLite-only migration (consuming a numeric prefix with no Postgres counterpart) and a pending-decisions store whose terminal vocabulary matches this feature's `approval_decisions` CHECK. Consequences, all handled above: prefix computation spans the whole migrations directory; no Postgres mirror and no manifest entry for its migration; no edit to the parity test's shared-table literal; and its own requirements-diff guard is in the retired set.
-- [ ] **The hosted Supabase Postgres project — PROVISIONED.** Major version 17 (no patch pin anywhere). Reached over the network via `DATABASE_URL` from a gitignored `.env`; **no local database, no Docker, no CI service container**. The DSN is supplied by the developer and never committed. Absent the variable, the integration criteria skip — and per the F3 gate above, a skip-only run cannot ship this feature.
+- [ ] **A reachable Postgres — PROVISIONED, by the developer, outside this feature.** Major version 17 (no patch pin anywhere). Reached only via `DATABASE_URL` from a gitignored `.env`; this feature installs, starts, and containerises nothing, and adds no CI service container. The DSN is supplied by the developer, is never committed, and the code never learns anything about the target beyond what the driver needs. Absent the variable, the integration criteria skip — and per the F3 gate above, a skip-only run cannot ship this feature.
 - [ ] **`python-dotenv`** — already pinned; the repo's existing lazy-guarded `load_dotenv` convention is reused, not replaced. No new pin.
 - **Downstream:** feature 16 (`connectors-audit-infra`) depends on this feature for the Postgres path; its queue row already points at 10a — edit nothing there. Feature 16 binds `DEFAULT_TENANT_ID` to `BOOTSTRAP_TENANT_ID` by import and asserts identity, appends its own migration filename to `db/migrations/postgres.manifest`, uses the `pg_conn` fixture, and relies on `pytest.ini`'s `integration` marker. Nothing here may rename, relocate, or database-couple `BOOTSTRAP_TENANT_ID`, `is_available`, `connect`, `pg_conn`, or the manifest's append-at-end semantics.
 
@@ -258,7 +259,7 @@ This feature **edits `core/graph/resolution.py`, which is feature 10's shipped f
 
 **Rating:** L
 
-**Rationale:** Every item is a *first* for this repo: the first Postgres driver, the first `DATABASE_URL`, the first migration ever executed, the first pytest configuration file, the first test tier requiring external infrastructure, and the first application code writing to a second engine — now over a network to a shared hosted project rather than a disposable local one. Risks priced in: more than one shipped migration is destructive on re-execution and all are contained by the runner rather than rewritten, with the destructive-file guard now the only safety net since there is no throwaway container; the split-store write path has no shared transaction and is mitigated by write ordering plus a *coverage* reconciliation; the audit/actor type mismatch is sidestepped by writing NULL; and a live credential is in play, so secret hygiene is a hard criterion rather than a convention. The load-bearing risks are that adding `pytest.ini` changes rootdir and collection for a suite that has never had a config file, and that this feature must retire shipped guard tests in the same commit as the change that contradicts them.
+**Rationale:** Every item is a *first* for this repo: the first Postgres driver, the first `DATABASE_URL`, the first migration ever executed, the first pytest configuration file, the first test tier requiring external infrastructure, and the first application code writing to a second engine — one whose location is a deployment detail the code is forbidden to know. Risks priced in: more than one shipped migration is destructive on re-execution and all are contained by the runner rather than rewritten, with the destructive-file guard the only safety net since the target is never assumed disposable; the split-store write path has no shared transaction and is mitigated by write ordering plus a *coverage* reconciliation; the audit/actor type mismatch is sidestepped by writing NULL; and a live credential is in play, so secret hygiene is a hard criterion rather than a convention. The load-bearing risks are that adding `pytest.ini` changes rootdir and collection for a suite that has never had a config file, and that this feature must retire shipped guard tests in the same commit as the change that contradicts them.
 
 ---
 
@@ -269,17 +270,17 @@ This feature **edits `core/graph/resolution.py`, which is feature 10's shipped f
 ```
 Stage 6 Resolution (feature 10, SQLite)
     └─ if the availability helper reports available (THIS FEATURE):
-         1. hosted store: audit row            ← log_resolution()          (INSERT-only, written FIRST, actor_id NULL)
-         2. hosted store: approval decision     ← record_approval_decision()
-         3. SQLite       graph mutation         ← feature 10's transaction
+         1. Postgres: audit row                 ← log_resolution()          (INSERT-only, written FIRST, actor_id NULL)
+         2. Postgres: approval decision         ← record_approval_decision()
+         3. SQLite:   graph mutation            ← feature 10's transaction
        else: steps 1-2 are no-ops; Stage 6 behaves exactly as feature 10 ships it.
 ```
 
 ### Implementation Notes (constraints for the build)
 
-1. **The database is a hosted Supabase project, reached only through `DATABASE_URL`.** There is no local database on this machine and none is to be installed, scripted, or documented. No `docker`, no `initdb`, no bare `psql`, no `testcontainers`, no CI service container. Absence of `DATABASE_URL` means *not available*, never an error. Postgres major version 17; never pin a patch version.
-2. **Treat `DATABASE_URL` as a live secret.** Never log it, never put it in an exception message, never write it under `features/` or `.rocket/`, never bake it into a fixture or snapshot. `.env` is gitignored; `.env.example` carries only an obviously fake placeholder. See the secret-hygiene criteria.
-3. **Set an explicit connect timeout on every connection, from a named module-level constant.** This brief pins no value: adopt an existing repo timeout convention if a build-time grep finds one, otherwise choose one and name it. Never assume localhost latency anywhere in code or tests.
+1. **The database is whatever `DATABASE_URL` names, and the code must work unchanged against any of them.** Hardcode no host, no port, no database name, no username; build no DSN from parts; assume no password component; assume nothing about where the server runs. Provision nothing — no `docker`, no `initdb`, no server-start instructions, no `testcontainers`, no CI service container. Absence of `DATABASE_URL` means *not available*, never an error. Postgres major version 17; never pin a patch version.
+2. **Treat `DATABASE_URL` as a live secret regardless of what the current value contains.** Never log it, never put it in an exception message, never write it under `features/` or `.rocket/`, never bake it into a fixture or snapshot. `.env` is gitignored; `.env.example` carries only an obviously fake placeholder. See the secret-hygiene criteria.
+3. **Set an explicit connect timeout on every connection, from a named module-level constant.** This brief pins no value: adopt an existing repo timeout convention if a build-time grep finds one, otherwise choose one and name it. An untimed connect can hang forever on any target, which is why this is unconditional; and no code or test may assume any particular connect or query latency.
 4. **Every test command is `.venv/bin/python -m pytest ...`.** Bare `pytest` is not on PATH, and `.venv/bin/pytest` does not put the repo root on `sys.path`, so every `from core...` import fails to collect.
 5. **An unregistered or non-matching marker fails silently, not loudly.** Any criterion that "passes" by selecting zero tests is false signal — hence the collected-count-greater-than-zero assertions, and the separate F3 gate on tests that actually *executed*.
 6. **Do not put forbidden tokens into feature 10's shipped modules.** The Stage 6 call site reaches the database only through the availability helper and the writer functions. The forbidden-token set and the covered-path set are read from the shipped guard's own regex at build time and never transcribed. The write-ordering rationale is documented in this feature's new modules, not in feature 10's.
@@ -288,9 +289,9 @@ Stage 6 Resolution (feature 10, SQLite)
 9. **Migration prefixes are shared with SQLite-only migrations.** Compute the next free prefix over the whole directory, `_sqlite` files included — feature 10b's SQLite-only migration owns a prefix with no Postgres counterpart. Never write a number into a brief or a comment.
 10. **`tenant_id` mismatch between engines.** The Postgres columns are `UUID NOT NULL REFERENCES tenants(id)`; the SQLite convention is a nullable `tenant_id TEXT` and fixtures load NULL. Writers fall back to `BOOTSTRAP_TENANT_ID` when the caller passes `None`, and call `resolve_or_create_tenant` otherwise. This is the most likely first-run failure, and feature 16 depends on the seeded row.
 11. **`actor_id` is UUID; the in-tree actor is a plain string. Write NULL.** Do not coerce, do not hash into a UUID, do not widen the column.
-12. **Write Postgres before SQLite.** The ordering is the mitigation. A timeout on the network write must fail before the SQLite mutation, not skip past it.
+12. **Write Postgres before SQLite.** The ordering is the mitigation. A timeout on the Postgres write must fail before the SQLite mutation, not skip past it.
 13. **Reconciliation is coverage, never count equality**, and must normalize timestamps across the two engines before comparing.
-14. **Integration tests roll back at teardown.** The hosted project is shared; a committing test pollutes it for every other contributor and for feature 16's live seam assertion.
+14. **Integration tests roll back at teardown.** The target is never assumed disposable; a committing test pollutes whatever database the runner was pointed at, and feature 16's live seam assertion runs against the same one.
 15. **`--strict-markers` is deliberate.** It converts the class of bug this feature exists to fix into a hard error for everyone after.
 16. **Do not key approval dispositions on `core.matching.types.Action`.** Key on the terminal disposition strings feature 10's resolution module writes, derived by grep at build time; normalize case into the CHECK vocabulary.
 17. **Cite symbols, not coordinates.** No `file.py:NNN`, no counts, no "exactly N" claims about the tree anywhere in this feature's code, comments, tests, or logs. Every quantitative check is an invariant computed at build or test time.
@@ -298,10 +299,10 @@ Stage 6 Resolution (feature 10, SQLite)
 ### V1 Hard Constraints (status-marked per `.claude/rules/01-nexus-finance-v1.md` §0)
 
 - `[BUILT]` SQLite graph store — remains the only store for canonical/alias/edge/system-reference data, and for feature 10b's pending-decision rows. This feature does not move any of it.
-- `[PLANNED → this feature]` Postgres at runtime: driver, `DATABASE_URL`, migration execution, `approval_decisions`, `audit_log` — against a hosted Supabase project.
+- `[PLANNED → this feature]` Postgres at runtime: driver, `DATABASE_URL`, migration execution, `approval_decisions`, `audit_log` — against whatever Postgres `DATABASE_URL` names.
 - `[PARTIAL] → code-enforced here` Audit log append-only. `audit.py` exposes INSERT only. The "append-only" wording in `db/schema.sql` is a **SQL comment** — grep-assert that file contains no `CREATE TRIGGER`, no `CREATE RULE`, and no `REVOKE` touching `audit_log`. Do not cite the comment as an enforced constraint.
-- `[PLANNED]` RLS. No `CREATE POLICY` anywhere; no query filters on `tenant_id`. New writes carry `tenant_id` as a value; they are not RLS-scoped. Note that using a hosted Supabase project does **not** confer RLS — none is configured and none is added here.
-- `[PLANNED]` Auth. `supabase==2.9.0` stays unimported and the Supabase SDK is not used; the project is consumed purely as a Postgres endpoint. `api/` remains stubs. `actor_id` staying NULL is consistent with there being no authenticated principal in V1.
+- `[PLANNED]` RLS. No `CREATE POLICY` anywhere; no query filters on `tenant_id`. New writes carry `tenant_id` as a value; they are not RLS-scoped. No target confers RLS for free — none is configured and none is added here.
+- `[PLANNED]` Auth. `supabase==2.9.0` stays unimported and no vendor SDK is used; the target is consumed purely as a Postgres endpoint. `api/` remains stubs. `actor_id` staying NULL is consistent with there being no authenticated principal in V1.
 
 ### Relevant Spec Sections
 

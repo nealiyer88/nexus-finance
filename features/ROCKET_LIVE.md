@@ -232,3 +232,5 @@ The matcher orchestrator (feature 12) is the coordinator that takes entities fro
 ### 2026-08-23T00:40:47 · 12 · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
 
 ### 2026-08-23T00:40:51 · 12 · 🚦 full gates PASS — clear to ship
+
+### 2026-08-23T00:40:51 · 12 · ✅ SHIPPED — both reviews PASS, queue flipped, committed (~$9.5849 spent).
