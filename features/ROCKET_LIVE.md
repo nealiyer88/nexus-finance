@@ -215,3 +215,10 @@ The matcher orchestrator (feature 12) is the coordinator that takes entities fro
 
 ### 2026-08-23T00:30:41 · 12 · 🧪 review round 1 — QA=PASS Code=FAIL
 ### 00:31:21 · 12 · 🩹 fixing: CR-001 queued-write commit boundary
+
+### 2026-08-23T00:31:31 · 12 · 🔍 qa review running
+
+### 2026-08-23T00:35:17 · 12 · 🔍 code review running
+
+### 2026-08-23T00:37:00 · 12 · 🧪 review round 2 — QA=PASS Code=FAIL
+### 00:37:39 · 12 · 🩹 fixing: [CR-BLOCKING] pending-persistence invariant test uses weak pooled bound

@@ -200,22 +200,16 @@ def test_run_ingestion_pending_persistence_invariant(conn: sqlite3.Connection) -
         {"match": False, "confidence": 0.55, "reasoning": "uncertain", "signals": []}
     )
     run_ingestion(_qb_connector(), conn, "tenant-test", llm_client=fake_client)
-    summary = run_ingestion(_ruddr_connector(), conn, "tenant-test", llm_client=fake_client)
 
-    pending_rows = conn.execute("SELECT COUNT(*) FROM pending_decisions").fetchone()[0]
-    # Pending rows accumulate across both runs (decision_key is stable per
-    # (tenant, source, source_id, top_canonical_id)); the second run's own
-    # queued bucket count is a lower bound check against the delta, so we
-    # instead assert the invariant directly against the run that owns the
-    # freshest count: every currently-'pending' row traces to some queued
-    # MatchResult from one of the two runs, and the ruddr run's own queued
-    # bucket count matches what THIS run added.
-    pending_status_counts = conn.execute(
-        "SELECT status, COUNT(*) FROM pending_decisions GROUP BY status"
-    ).fetchall()
-    total_pending_rows = sum(count for _status, count in pending_status_counts)
-    assert total_pending_rows > 0
-    assert summary.queued_for_review <= total_pending_rows
+    # Isolate the ruddr run's own before/after delta on the pending table,
+    # rather than a pooled cross-run total, so this actually checks the
+    # brief's literal equality invariant: rows persisted by THIS run must
+    # equal THIS run's own queued_for_review bucket count.
+    before_count = conn.execute("SELECT COUNT(*) FROM pending_decisions").fetchone()[0]
+    summary = run_ingestion(_ruddr_connector(), conn, "tenant-test", llm_client=fake_client)
+    after_count = conn.execute("SELECT COUNT(*) FROM pending_decisions").fetchone()[0]
+
+    assert after_count - before_count == summary.queued_for_review
 
 
 def test_run_ingestion_match_type_distribution_tracked(conn: sqlite3.Connection) -> None:
