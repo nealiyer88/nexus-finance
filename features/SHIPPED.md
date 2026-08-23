@@ -27,3 +27,9 @@ Brief: features/pipeline/resolution-graph-update.md
 Tests: 380 passed
 Reviews: QA PASS (blind), Code PASS
 Gates: QB=NOT RUN, Exercise=SKIPPED
+
+## 2026-08-22 — 10b (shipped by rocket)
+Brief: features/pipeline/pending-decision-persistence.md
+Tests: 400 passed
+Reviews: QA PASS (blind), Code PASS
+Gates: QB=NOT RUN, Exercise=SKIPPED

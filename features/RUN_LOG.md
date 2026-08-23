@@ -263,3 +263,18 @@
 | 2026-08-22T19:13:51 | 12 | cost:reality-check | claude | $1.1397320000000002 |
 | 2026-08-22T19:13:51 | 12 | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/12-reality-check.md |
 | 2026-08-22T19:13:51 | 12 | reality-check | opus | FLAG (blocked; see features/_reality/12-reality-check.md) |
+| 2026-08-22T20:41:12 | 10a | cost:reality-check | claude | $1.6706680000000003 |
+| 2026-08-22T20:41:12 | 10a | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/10a-reality-check.md |
+| 2026-08-22T20:41:12 | 10a | reality-check | opus | FLAG (blocked; see features/_reality/10a-reality-check.md) |
+| 2026-08-22T20:48:10 | 10b | cost:reality-check | claude | $1.1706549999999998 |
+| 2026-08-22T20:48:10 | 10b | reality-check | opus | GO |
+| 2026-08-22T20:50:52 | 10b | cost:promptgen | claude | $0.691676 |
+| 2026-08-22T20:50:52 | 10b | prompt-gen | opus | done |
+| 2026-08-22T20:58:16 | 10b | cost:build-session | claude | $1.8121928 |
+| 2026-08-22T20:58:16 | 10b | gates:pre-merge | — | PASS (features/_logs/10b-gates-pre-merge.md) |
+| 2026-08-22T21:03:01 | 10b | cost:review-qa | claude | $0.5994858000000001 |
+| 2026-08-22T21:09:24 | 10b | retry | claude | transient API failure (exit 1) — attempt 1/3, waiting 25s |
+| 2026-08-22T21:12:44 | 10b | cost:review-code | claude | $0.4242564 |
+| 2026-08-22T21:12:45 | 10b | qb-validation | — | SKIPPED (QB gate off / no QB keywords) |
+| 2026-08-22T21:12:45 | 10b | exercise-gate | hook | SKIPPED (no project exercise script) |
+| 2026-08-22T21:12:46 | 10b | gates:post-integration | — | PASS (features/_logs/10b-gates-post-integration.md) |

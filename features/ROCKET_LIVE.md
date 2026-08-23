@@ -146,3 +146,37 @@ This feature assumes an approval database table exists at runtime (for storing p
 
 ### 2026-08-22T19:13:51 · 12 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
 The reality check found six significant gaps between the matcher orchestrator brief and what actually exists in the codebase: key types like `EntityRegistry` and `MatchResult` don't exist, the test expectations don't match how the system behaves, and the brief's pseudocode doesn't align with the actual Stage 6 APIs. The verdict is FLAG, meaning the brief needs clarification and revision before building can start.
+
+### 2026-08-22T20:30:21 · 10A · 🚀 Starting 10a (postgres-store-bootstrap.md)
+
+### 2026-08-22T20:30:21 · 10A · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-22T20:41:12 · 10A · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+Feature 10a's technical design passes verification, but three human decisions are blocking it: two existing tests explicitly forbid the exact code changes and dependency additions this feature requires, and there's no Postgres database available to test against. The feature can't proceed until someone decides whether to modify those tests or provision the database infrastructure first.
+
+### 2026-08-22T20:41:25 · 10B · 🚀 Starting 10b (pending-decision-persistence.md)
+
+### 2026-08-22T20:41:25 · 10B · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-22T20:48:10 · 10B · ✅ reality check GO — brief matches the current repo
+
+### 2026-08-22T20:50:52 · 10B · 📝 Wrote the build prompt
+The build creates a pending-approval queue for entity matches the system can't confidently resolve—storing them for human review, preventing duplicate queuing, and recording final decisions. It adds a new database table and Python module to manage this queue without modifying any existing pipeline code. All changes are additive: one new migration file, one new module, and corresponding tests.
+
+### 2026-08-22T20:51:04 · 10B · 🔨 Builder starting — code + tests + commit
+### 20:51:58 · 10b · 🔨 building
+### 20:57:48 · 10b · 🧪 tests green (400 passed)
+
+### 2026-08-22T20:58:16 · 10B · 🧹 fast gates PASS
+
+### 2026-08-22T20:58:16 · 10B · 🔍 qa review running
+
+### 2026-08-22T21:03:01 · 10B · 🔍 code review running
+
+### 2026-08-22T21:09:24 · 10B · ⏳ API busy — retrying in 25s (attempt 1/3)
+
+### 2026-08-22T21:12:45 · 10B · 🧪 review round 1 — QA=PASS Code=PASS
+
+### 2026-08-22T21:12:45 · 10B · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
+
+### 2026-08-22T21:12:46 · 10B · 🚦 full gates PASS — clear to ship
