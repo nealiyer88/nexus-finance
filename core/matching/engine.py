@@ -181,14 +181,26 @@ def _write_queued(
     """Stage 6 QUEUE_FOR_REVIEW write: durably persist the decision via
     feature 10b's enqueue call. No action check here — `enqueue_pending`
     self-gates on `disposition.action`, exactly as the training-pair
-    store does."""
+    store does.
+
+    Transaction boundary is the orchestrator's, not the store's — 10b's
+    `enqueue_pending` never commits or rolls back, so this call commits
+    on success and rolls back on failure, mirroring `resolve_match`/
+    `create_new_entity` in `core/graph/resolution.py`.
+    """
     top = disposition.top_match
     if top is None:
         # Disposition's own contract guarantees top_match is non-None
         # whenever action != NO_MATCH; nothing to enqueue if it lied.
         return None
-    proposal = _build_confirmed_proposal(entity, top.canonical_id, top.score, reasoning_trace)
-    return enqueue_pending(conn, disposition, entity, proposal, tenant_id)
+    try:
+        proposal = _build_confirmed_proposal(entity, top.canonical_id, top.score, reasoning_trace)
+        pending_id = enqueue_pending(conn, disposition, entity, proposal, tenant_id)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return pending_id
 
 
 def match(incoming: NormalizedEntity, ctx: MatchContext) -> MatchResult:

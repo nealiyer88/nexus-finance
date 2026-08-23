@@ -193,3 +193,25 @@ The build creates a pending-approval queue for entity matches the system can't c
 
 ### 2026-08-22T21:35:09 · 12 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
 The reality check flagged a **mismatch between feature 12's brief and an earlier shipped feature (10b)**: the brief says human-review queue mechanics are out of scope, but 10b built a pending decision store and explicitly expects feature 12 to write to it—meaning code built to this brief will either ignore data 10b created or silently discard review decisions. A human decision is needed: should feature 12 integrate with the queue store, or is that deferred to later work?
+
+### 2026-08-23T00:11:20 · 12 · 🚀 Starting 12 (matcher-orchestrator.md)
+
+### 2026-08-23T00:11:20 · 12 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-23T00:14:32 · 12 · ✅ reality check GO — brief matches the current repo
+
+### 2026-08-23T00:16:18 · 12 · 📝 Wrote the build prompt
+The matcher orchestrator (feature 12) is the coordinator that takes entities from financial systems and runs them through a six-stage matching process to identify which ones should link together in the graph. It processes entities from QuickBooks and RUDDR connectors, automatically approves obvious matches, queues ambiguous ones for human review, and creates new records when no match is found.
+
+### 2026-08-23T00:16:30 · 12 · 🔨 Builder starting — code + tests + commit
+### 00:25:41 · 12 · 🔨 building
+### 00:25:41 · 12 · 🧪 tests green (421 passed)
+
+### 2026-08-23T00:26:14 · 12 · 🧹 fast gates PASS
+
+### 2026-08-23T00:26:14 · 12 · 🔍 qa review running
+
+### 2026-08-23T00:28:14 · 12 · 🔍 code review running
+
+### 2026-08-23T00:30:41 · 12 · 🧪 review round 1 — QA=PASS Code=FAIL
+### 00:31:21 · 12 · 🩹 fixing: CR-001 queued-write commit boundary
