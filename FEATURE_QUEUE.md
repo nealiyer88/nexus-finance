@@ -33,7 +33,7 @@
 | 10a | postgres-store-bootstrap | features/infrastructure/postgres-store-bootstrap.md | 2, 10 | BLOCKED | v4 §8,10 |
 | 10b | pending-decision-persistence | features/pipeline/pending-decision-persistence.md | 10 | SHIPPED | v4 §14 |
 | 11 | approval-queue | features/dashboard/approval-queue.md | 9, 10, 10b, 16 | QUEUED | v4 |
-| 12 | matcher-orchestrator | features/pipeline/matcher-orchestrator.md | 7, 8, 8a, 8b, 9, 10, 10b | QUEUED | v4 §7 |
+| 12 | matcher-orchestrator | features/pipeline/matcher-orchestrator.md | 7, 8, 8a, 8b, 9, 10, 10b | SHIPPED | v4 §7 |
 | 13 | historical-cold-start | features/data/historical-cold-start.md | 11, 12 | QUEUED | v4 |
 | 14 | overview-entity-browser | features/dashboard/overview-entity-browser.md | 10, 11, 16 | QUEUED | v4 |
 | 15 | ar-reconciliation | features/dashboard/ar-reconciliation.md | 12, 14 | QUEUED | v4 |

@@ -285,3 +285,20 @@
 | 2026-08-22T21:35:08 | 12 | cost:reality-check | claude | $1.6162180000000002 |
 | 2026-08-22T21:35:09 | 12 | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/12-reality-check.md |
 | 2026-08-22T21:35:09 | 12 | reality-check | opus | FLAG (blocked; see features/_reality/12-reality-check.md) |
+| 2026-08-23T00:14:32 | 12 | cost:reality-check | claude | $1.4721434999999998 |
+| 2026-08-23T00:14:32 | 12 | reality-check | opus | GO |
+| 2026-08-23T00:16:18 | 12 | cost:promptgen | claude | $0.8155844999999999 |
+| 2026-08-23T00:16:18 | 12 | prompt-gen | opus | done |
+| 2026-08-23T00:26:13 | 12 | cost:build-session | claude | $2.9157028000000005 |
+| 2026-08-23T00:26:14 | 12 | gates:pre-merge | — | PASS (features/_logs/12-gates-pre-merge.md) |
+| 2026-08-23T00:28:14 | 12 | cost:review-qa | claude | $0.6529936000000001 |
+| 2026-08-23T00:30:41 | 12 | cost:review-code | claude | $0.6551821999999999 |
+| 2026-08-23T00:31:31 | 12 | cost:fix-session | claude | $0.2791986 |
+| 2026-08-23T00:35:17 | 12 | cost:review-qa | claude | $0.8947394000000002 |
+| 2026-08-23T00:37:00 | 12 | cost:review-code | claude | $0.5701612 |
+| 2026-08-23T00:38:04 | 12 | cost:fix-session | claude | $0.26849419999999996 |
+| 2026-08-23T00:39:26 | 12 | cost:review-qa | claude | $0.518027 |
+| 2026-08-23T00:40:47 | 12 | cost:review-code | claude | $0.5427018 |
+| 2026-08-23T00:40:47 | 12 | qb-validation | — | SKIPPED (QB gate off / no QB keywords) |
+| 2026-08-23T00:40:47 | 12 | exercise-gate | hook | SKIPPED (no project exercise script) |
+| 2026-08-23T00:40:51 | 12 | gates:post-integration | — | PASS (features/_logs/12-gates-post-integration.md) |

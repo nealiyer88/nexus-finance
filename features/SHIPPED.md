@@ -33,3 +33,9 @@ Brief: features/pipeline/pending-decision-persistence.md
 Tests: 400 passed
 Reviews: QA PASS (blind), Code PASS
 Gates: QB=NOT RUN, Exercise=SKIPPED
+
+## 2026-08-23 — 12 (shipped by rocket)
+Brief: features/pipeline/matcher-orchestrator.md
+Tests: 421 passed
+Reviews: QA PASS (blind), Code PASS
+Gates: QB=NOT RUN, Exercise=SKIPPED
