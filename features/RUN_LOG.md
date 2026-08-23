@@ -252,3 +252,14 @@
 | 2026-08-22T19:06:20 | 10 | qb-validation | — | SKIPPED (QB gate off / no QB keywords) |
 | 2026-08-22T19:06:20 | 10 | exercise-gate | hook | SKIPPED (no project exercise script) |
 | 2026-08-22T19:06:22 | 10 | gates:post-integration | — | PASS (features/_logs/10-gates-post-integration.md) |
+| 2026-08-22T19:06:22 | 10 | feature-cost | — | $5.1823 / $50 |
+| 2026-08-22T19:06:22 | 10 | SHIPPED | rocket | complete |
+| 2026-08-22T19:09:02 | 10a | cost:reality-check | claude | $1.1785155 |
+| 2026-08-22T19:09:02 | 10a | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/10a-reality-check.md |
+| 2026-08-22T19:09:02 | 10a | reality-check | opus | FLAG (blocked; see features/_reality/10a-reality-check.md) |
+| 2026-08-22T19:11:19 | 11 | cost:reality-check | claude | $0.7615295 |
+| 2026-08-22T19:11:19 | 11 | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/11-reality-check.md |
+| 2026-08-22T19:11:19 | 11 | reality-check | opus | FLAG (blocked; see features/_reality/11-reality-check.md) |
+| 2026-08-22T19:13:51 | 12 | cost:reality-check | claude | $1.1397320000000002 |
+| 2026-08-22T19:13:51 | 12 | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/12-reality-check.md |
+| 2026-08-22T19:13:51 | 12 | reality-check | opus | FLAG (blocked; see features/_reality/12-reality-check.md) |

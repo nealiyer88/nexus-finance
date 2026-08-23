@@ -30,14 +30,40 @@
 | 8b | b3-transactions-table-and-amount-signal | features/pipeline/b3-transactions-table-and-amount-signal.md | 8a | SHIPPED | v4 §9 B3 |
 | 9 | threshold-llm-fallback | features/pipeline/threshold-llm-fallback.md | 8 | SHIPPED | v3 (unaffected by v4) |
 | 10 | resolution-graph-update | features/pipeline/resolution-graph-update.md | 9 | SHIPPED | v4 §9 |
-| 10a | postgres-store-bootstrap | features/infrastructure/postgres-store-bootstrap.md | 2, 10 | BLOCKED | v4 §8,10 |
-| 11 | approval-queue | features/dashboard/approval-queue.md | 9, 10 | BLOCKED | v4 |
-| 12 | matcher-orchestrator | features/pipeline/matcher-orchestrator.md | 7, 8, 8a, 8b, 9, 10 | BLOCKED | v4 §7 |
+| 10a | postgres-store-bootstrap | features/infrastructure/postgres-store-bootstrap.md | 2, 10 | QUEUED | v4 §8,10 |
+| 10b | pending-decision-persistence | features/pipeline/pending-decision-persistence.md | 10 | QUEUED | v4 §14 |
+| 11 | approval-queue | features/dashboard/approval-queue.md | 9, 10, 10b, 16 | QUEUED | v4 |
+| 12 | matcher-orchestrator | features/pipeline/matcher-orchestrator.md | 7, 8, 8a, 8b, 9, 10 | QUEUED | v4 §7 |
 | 13 | historical-cold-start | features/data/historical-cold-start.md | 11, 12 | QUEUED | v4 |
-| 14 | overview-entity-browser | features/dashboard/overview-entity-browser.md | 10, 11 | QUEUED | v4 |
+| 14 | overview-entity-browser | features/dashboard/overview-entity-browser.md | 10, 11, 16 | QUEUED | v4 |
 | 15 | ar-reconciliation | features/dashboard/ar-reconciliation.md | 12, 14 | QUEUED | v4 |
 | 16 | connectors-audit-infra | features/infrastructure/connectors-audit-infra.md | 5, 6, 10a | QUEUED | v4 |
-| 17 | signup-onboarding | features/infrastructure/signup-onboarding.md | 1, 2, 3, 4, 5, 6, 7, 8, 8a, 9, 10, 11, 12, 13, 14, 15, 16 | QUEUED | v4 |
+| 17 | signup-onboarding | features/infrastructure/signup-onboarding.md | 1, 2, 3, 4, 5, 6, 7, 8, 8a, 8b, 9, 10, 10a, 10b, 11, 12, 13, 14, 15, 16 | QUEUED | v4 |
+
+> **Brief sweep + dependency correction (2026-08-22):** 10a, 11 and 12 each blocked
+> on a reality-check FLAG for brief/repo drift. Rather than fix them one block at a
+> time, every unbuilt brief (10a, 11, 12, 13, 14, 15, 16, 17) was re-verified against
+> the shipped code in a single pass and rewritten. All `file:line` citations, line
+> counts and "exactly N" repo-state claims were removed — those pins are what caused
+> the repeated blocks, since an earlier queued feature invalidates them mid-run.
+>
+> The sweep exposed three structural holes that were never anybody's job:
+> 1. **Nothing persisted a QUEUE_FOR_REVIEW decision.** Stage 4's `Disposition` is
+>    in-memory and evaporated, so feature 11 read from a store no feature wrote.
+>    NEW feature **10b** (pending-decision-persistence) owns it, targeting the live
+>    SQLite store — deliberately NOT Postgres, so it does not wait on 10a.
+> 2. **The Dash app shell is owned by 16 but three pages queued before it.** 11 and
+>    14 now depend on 16 explicitly; 15 inherits it transitively via 14. 16 now
+>    publishes an explicit shell contract (page registry, sidebar slot ids) so the
+>    pages build against a contract rather than guessing.
+> 3. **Nothing ingests transactions.** 8b shipped the `transactions` table and the
+>    amount signal; both connectors return `[]` from `read_transactions` and no
+>    module persists a `NormalizedTransaction`. Feature 15 (AR reconciliation) is
+>    therefore testable against seeded rows but computes zero on the real fixture
+>    path. NOT yet owned by any feature — flagged, not fixed.
+>
+> Row 17's dependency list was missing 8b and 10a; corrected, and 10b added.
+> Row 11 re-rated M → L (rehydration + forward deps, not CRUD).
 
 > **v4 retrofit note (2026-06-20):** Product spec v4 made pre-trained fastText
 > V1-mandatory (Stage 2c blocking + Stage 3 Signal Set C) and raised the Phase 1

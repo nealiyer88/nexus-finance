@@ -123,3 +123,26 @@ The team is implementing the final stage of the entity-matching pipeline: the co
 ### 2026-08-22T19:06:20 · 10 · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
 
 ### 2026-08-22T19:06:22 · 10 · 🚦 full gates PASS — clear to ship
+
+### 2026-08-22T19:06:22 · 10 · ✅ SHIPPED — both reviews PASS, queue flipped, committed (~$5.1823 spent).
+
+### 2026-08-22T19:06:22 · 10A · 🚀 Starting 10a (postgres-store-bootstrap.md)
+
+### 2026-08-22T19:06:22 · 10A · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-22T19:09:02 · 10A · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The reality check flagged feature 10a as needing clarification before building: the feature tries to map how routing decisions are made (a four-option system) to how approval decisions are recorded in the database (a three-option system), but these don't align—especially around a decision outcome called "corrected" that doesn't exist anywhere in the codebase. A human needs to decide which vocabulary the feature uses and where "corrected" actually comes from.
+
+### 2026-08-22T19:09:17 · 11 · 🚀 Starting 11 (approval-queue.md)
+
+### 2026-08-22T19:09:17 · 11 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-22T19:11:19 · 11 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+This feature assumes an approval database table exists at runtime (for storing pending decisions), but that table only exists in an aspirational Postgres schema—the actual runtime uses SQLite without it. The approval API endpoints also expect to rehydrate complex objects from just an ID, which won't work without solving the storage problem first. Seven structural decisions need sign-off before building can proceed: whether this feature owns creating the approvals table, how approval IDs map to the matching logic, whether rejected items should auto-log for training, whether to build the dashboard app shell now or later, how tenant security will actually work, whether to drop the audit-log requirement, and fixing the test command.
+
+### 2026-08-22T19:11:30 · 12 · 🚀 Starting 12 (matcher-orchestrator.md)
+
+### 2026-08-22T19:11:30 · 12 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-22T19:13:51 · 12 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The reality check found six significant gaps between the matcher orchestrator brief and what actually exists in the codebase: key types like `EntityRegistry` and `MatchResult` don't exist, the test expectations don't match how the system behaves, and the brief's pseudocode doesn't align with the actual Stage 6 APIs. The verdict is FLAG, meaning the brief needs clarification and revision before building can start.
