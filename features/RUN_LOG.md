@@ -304,3 +304,6 @@
 | 2026-08-23T00:40:51 | 12 | gates:post-integration | — | PASS (features/_logs/12-gates-post-integration.md) |
 | 2026-08-23T00:40:51 | 12 | feature-cost | — | $9.5849 / $50 |
 | 2026-08-23T00:40:51 | 12 | SHIPPED | rocket | complete |
+| 2026-08-23T09:16:21 | 10a | cost:reality-check | claude | $1.7816965000000002 |
+| 2026-08-23T09:16:21 | 10a | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/10a-reality-check.md |
+| 2026-08-23T09:16:22 | 10a | reality-check | opus | FLAG (blocked; see features/_reality/10a-reality-check.md) |

@@ -234,3 +234,10 @@ The matcher orchestrator (feature 12) is the coordinator that takes entities fro
 ### 2026-08-23T00:40:51 · 12 · 🚦 full gates PASS — clear to ship
 
 ### 2026-08-23T00:40:51 · 12 · ✅ SHIPPED — both reviews PASS, queue flipped, committed (~$9.5849 spent).
+
+### 2026-08-23T09:12:03 · 10A · 🚀 Starting 10a (postgres-store-bootstrap.md)
+
+### 2026-08-23T09:12:03 · 10A · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-23T09:16:22 · 10A · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The infrastructure blueprint passed most structural checks, but three specific requirements in the brief don't align with the actual codebase and need clarification before work can begin: the disposition vocabulary the QA test expects doesn't exist in code as specified, a database-column matching pattern won't find the actual columns, and documentation files already violate the secret-storage rule the brief sets. A human decision on each point is needed to unblock the build.

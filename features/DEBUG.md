@@ -32,3 +32,6 @@ Reason: reality check FLAG — brief no longer matches the repo; report: feature
 ## 2026-08-22T21:35:09 — 12 BLOCKED
 Reason: reality check FLAG — brief no longer matches the repo; report: features/_reality/12-reality-check.md
 
+## 2026-08-23T09:16:21 — 10a BLOCKED
+Reason: reality check FLAG — brief no longer matches the repo; report: features/_reality/10a-reality-check.md
+
