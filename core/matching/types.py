@@ -8,10 +8,14 @@ overlapping result types.
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Optional
 
+from core.matching.indices import EmbeddingIndex, NgramIndex, TokenIndex
+
 if TYPE_CHECKING:
+    from core.matching.llm_fallback import LLMClient
     from core.matching.scoring import BoostEntry
 
 
@@ -179,3 +183,71 @@ class Disposition:
     llm_assessment: Optional[LLMAssessment]
     tenant_id: Optional[str]
     abbreviation_rescue: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Feature 12 — Matcher orchestrator shapes
+# ---------------------------------------------------------------------------
+
+
+MatchType = Literal["deterministic", "scored", "llm", "new", "none"]
+
+
+@dataclass
+class MatchContext:
+    """Mutable run context threaded through `core.matching.engine.match()`.
+
+    Carries exactly what the shipped Stage 1-5 signatures demand: the
+    open connection, the tenant scope, the two blocking indices always
+    required by Stage 2, the optional fastText ANN index (Stage 2c —
+    absent-model-safe), and an optional injected Stage 5 `LLMClient`
+    (tests pass a fake; production leaves this `None` and Stage 5 falls
+    back to its own default factory).
+
+    NOT frozen: the orchestrator's index-rebuild policy (module-level
+    staleness bit in `core.graph.resolution`) replaces `token_index` /
+    `ngram_index` / `embedding_index` in place on this same instance
+    rather than handing back a new `MatchContext`.
+    """
+
+    conn: sqlite3.Connection
+    token_index: TokenIndex
+    ngram_index: NgramIndex
+    tenant_id: Optional[str] = None
+    embedding_index: Optional[EmbeddingIndex] = None
+    llm_client: Optional["LLMClient"] = None
+
+
+@dataclass(frozen=True)
+class MatchResult:
+    """Outcome of one `match()` call. Every field has a shipped producer —
+    see `core.matching.engine` for the per-path construction. There is
+    NO `audit_entry` field: no audit table or writer exists anywhere in
+    the tree (feature 10a, BLOCKED, owns that surface).
+
+    `match_type` distinguishes the code path taken, independent of the
+    `action` that decided the write:
+      - "deterministic" — Stage 1 exact-anchor hit (alias/email/employee_id).
+      - "new"            — Stage 2 blocking returned zero candidates; a
+                            canonical was created without ever reaching
+                            Stage 3/4 scoring.
+      - "scored"         — Stage 3/4 ran and banded the outcome directly
+                            (AUTO_APPROVE or QUEUE_FOR_REVIEW) without a
+                            Stage 5 LLM call.
+      - "llm"            — Stage 4 routed to LLM_FALLBACK; Stage 5 ran
+                            (or was caught unavailable/budget-exhausted)
+                            and the disposition was converted to
+                            QUEUE_FOR_REVIEW.
+      - "none"           — Stage 4 scored candidates but none cleared
+                            even the LLM_FALLBACK band (NO_MATCH); a new
+                            canonical was created from the rejected set.
+    """
+
+    source_entity_id: str
+    canonical_id: Optional[str]
+    confidence: float
+    match_type: MatchType
+    action: "Action"
+    signal_breakdown: Optional[SignalBreakdown]
+    disposition: Optional[Disposition]
+    reasoning_trace: str
