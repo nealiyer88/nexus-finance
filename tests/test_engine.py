@@ -18,14 +18,14 @@ import pytest
 
 from core.graph.resolution import mark_indices_stale, reset_indices_stale_flag
 from core.ingestion.normalizer import normalize_entity
-from core.matching.engine import AUTO_APPROVAL_ACTOR, match
+from core.matching.engine import AUTO_APPROVAL_ACTOR, _write_queued, match
 from core.matching.indices import EmbeddingIndex, NgramIndex, TokenIndex
 from core.matching.llm_fallback import (
     LLMBudgetExceededError,
     LLMNotConfiguredError,
     reset_call_budget,
 )
-from core.matching.types import MatchContext
+from core.matching.types import Disposition, MatchContext
 
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -545,3 +545,35 @@ def test_match_rebuilds_indices_after_stale_write(conn: sqlite3.Connection) -> N
 
     tokens = [t for t in first.normalized_name.split() if t]
     assert ctx.token_index.lookup(tokens)
+
+
+# ---------------------------------------------------------------------------
+# Stage 6 QUEUE_FOR_REVIEW guard
+# ---------------------------------------------------------------------------
+
+
+def test_write_queued_raises_on_contract_violating_disposition(
+    conn: sqlite3.Connection,
+) -> None:
+    """A QUEUE_FOR_REVIEW disposition with `top_match=None` violates
+    `Disposition`'s own contract. Silently returning None there would
+    count the entity in the run's `queued_for_review` bucket while
+    persisting no `pending_decisions` row — breaking the
+    persisted-rows == queued-count invariant with no failure. It must
+    raise instead."""
+    entity = _make_entity("Contract Violator Inc", source="ruddr", source_id="RUDDR-CV")
+    bad_disposition = Disposition(
+        source_entity_id=entity.source_id,
+        action="QUEUE_FOR_REVIEW",
+        top_match=None,
+        candidates_ranked=(),
+        cluster_conflict=False,
+        llm_assessment=None,
+        tenant_id=None,
+    )
+
+    before = conn.execute("SELECT COUNT(*) FROM pending_decisions").fetchone()[0]
+    with pytest.raises(RuntimeError):
+        _write_queued(conn, bad_disposition, entity, None, "trace")
+    after = conn.execute("SELECT COUNT(*) FROM pending_decisions").fetchone()[0]
+    assert after == before

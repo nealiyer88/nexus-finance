@@ -9,7 +9,10 @@ database server, no network. Schema is loaded from files, following the
 from __future__ import annotations
 
 import pathlib
+import re
 import sqlite3
+import subprocess
+import sys
 from typing import Any
 
 import pytest
@@ -212,6 +215,37 @@ def test_run_ingestion_pending_persistence_invariant(conn: sqlite3.Connection) -
     assert after_count - before_count == summary.queued_for_review
 
 
+def test_run_ingestion_reingest_refreshes_pending_rows_without_duplicating(
+    conn: sqlite3.Connection,
+) -> None:
+    """`enqueue_pending` is idempotent on its decision key, so a SECOND
+    ingestion of the SAME connector refreshes live rows in place rather
+    than inserting new ones. The equality invariant asserted by
+    `test_run_ingestion_pending_persistence_invariant` therefore holds
+    only on a connector's FIRST run; on a re-run the row delta is
+    strictly smaller than the queued count. This test pins that as
+    deliberate behaviour rather than leaving it untested — an
+    accidental loss of idempotency would show up here as duplicate
+    decision keys."""
+    fake_client = FakeLLMClient(
+        {"match": False, "confidence": 0.55, "reasoning": "uncertain", "signals": []}
+    )
+    first_summary = run_ingestion(_qb_connector(), conn, "tenant-test", llm_client=fake_client)
+    assert first_summary.queued_for_review > 0  # otherwise this proves nothing
+
+    before_count = conn.execute("SELECT COUNT(*) FROM pending_decisions").fetchone()[0]
+    second_summary = run_ingestion(_qb_connector(), conn, "tenant-test", llm_client=fake_client)
+    after_count = conn.execute("SELECT COUNT(*) FROM pending_decisions").fetchone()[0]
+
+    delta = after_count - before_count
+    assert delta < second_summary.queued_for_review
+    # Idempotency is on `decision_key`: no key may ever be duplicated.
+    distinct_keys = conn.execute(
+        "SELECT COUNT(DISTINCT decision_key) FROM pending_decisions"
+    ).fetchone()[0]
+    assert distinct_keys == after_count
+
+
 def test_run_ingestion_match_type_distribution_tracked(conn: sqlite3.Connection) -> None:
     fake_client = FakeLLMClient(
         {"match": False, "confidence": 0.4, "reasoning": "no match", "signals": []}
@@ -247,12 +281,29 @@ def test_run_ingestion_resets_call_budget_and_uses_injected_client_only(
     fake_client = FakeLLMClient(
         {"match": True, "confidence": 0.9, "reasoning": "ok", "signals": []}
     )
-    run_ingestion(_qb_connector(), conn, "tenant-test", llm_client=fake_client)
-    run_ingestion(_ruddr_connector(), conn, "tenant-test", llm_client=fake_client)
+    qb_summary = run_ingestion(_qb_connector(), conn, "tenant-test", llm_client=fake_client)
+    ruddr_summary = run_ingestion(_ruddr_connector(), conn, "tenant-test", llm_client=fake_client)
+
     # No live API call: FakeLLMClient never touches ANTHROPIC_API_KEY or
     # constructs anthropic.Anthropic. Its own call count is the only
     # assertable evidence Stage 5 used the injected fake.
-    assert isinstance(fake_client.calls, list)
+    #
+    # The expected count is DERIVED from the runs' own summaries, never
+    # hardcoded: `core.matching.engine.match` stamps match_type="llm" on
+    # exactly the entities that entered Stage 5, and `llm_assess` issues
+    # exactly one `client.assess` call per entry. So the fake's recorded
+    # call count must equal the two runs' combined "llm" match_type
+    # count. A hardcoded number here would self-invalidate the moment an
+    # earlier feature changed the fixtures.
+    expected_calls = qb_summary.match_type_counts.get(
+        "llm", 0
+    ) + ruddr_summary.match_type_counts.get("llm", 0)
+    assert expected_calls > 0, "fixtures produced no Stage 5 entries; test proves nothing"
+    assert len(fake_client.calls) == expected_calls
+    # Budget reset contract: the per-run budget is reset at the top of
+    # every run_ingestion, so neither run can be bounded by the other's
+    # usage — each run's own llm count is served in full.
+    assert len(fake_client.calls) > ruddr_summary.match_type_counts.get("llm", 0)
 
 
 def test_run_ingestion_second_connector_sees_first_connectors_writes(
@@ -290,8 +341,48 @@ def test_run_ingestion_unsupported_connector_category_raises(
 
 
 def test_full_suite_collection_sanity() -> None:
-    """Guards against a deselected-everything false-green: this module
-    alone must collect at least one test (trivially true if this test
-    itself collects), matching acceptance criterion 11's intent that a
-    bare exit code is not sufficient evidence of a real pass."""
-    assert True
+    """Guards against a deselected-everything false-green: pytest's own
+    collection output, for feature 12's two new test modules, must
+    report a collected count greater than zero. A bare exit code is not
+    sufficient evidence of a real pass (acceptance criterion 11).
+
+    `--collect-only` imports the modules but executes no test bodies, so
+    the subprocess cannot re-enter this test; it is additionally scoped
+    to the two named modules rather than the whole suite.
+
+    Invocation is the repo's documented form (`.venv/bin/python -m
+    pytest`, CLAUDE.md): bare `pytest` is not on PATH, and
+    `.venv/bin/pytest` fails to put the repo root on `sys.path`.
+    """
+    venv_python = REPO_ROOT / ".venv" / "bin" / "python"
+    interpreter = str(venv_python) if venv_python.exists() else sys.executable
+
+    completed = subprocess.run(
+        [
+            interpreter,
+            "-m",
+            "pytest",
+            "--collect-only",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+            str(REPO_ROOT / "tests" / "test_engine.py"),
+            str(REPO_ROOT / "tests" / "test_pipeline.py"),
+        ],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+
+    assert completed.returncode == 0, (
+        f"collection failed (rc={completed.returncode}):\n"
+        f"{completed.stdout}\n{completed.stderr}"
+    )
+    match = re.search(r"(\d+)\s+tests?\s+collected", completed.stdout)
+    assert match is not None, (
+        "could not parse a collected count from pytest output:\n"
+        f"{completed.stdout}\n{completed.stderr}"
+    )
+    collected = int(match.group(1))
+    assert collected > 0

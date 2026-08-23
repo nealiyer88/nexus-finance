@@ -191,8 +191,17 @@ def _write_queued(
     top = disposition.top_match
     if top is None:
         # Disposition's own contract guarantees top_match is non-None
-        # whenever action != NO_MATCH; nothing to enqueue if it lied.
-        return None
+        # whenever action != NO_MATCH. Returning None here instead would
+        # silently drop a queued entity: the run's queued_for_review
+        # bucket would still count it, but no pending_decisions row would
+        # exist, breaking the persisted-rows == queued-count invariant
+        # with no failure. Fail loudly, matching the AUTO_APPROVE branch's
+        # `assert top is not None` and the LLM_FALLBACK dispatch guard.
+        raise RuntimeError(
+            "Stage 6 QUEUE_FOR_REVIEW dispatch received a disposition with "
+            "top_match=None; Disposition guarantees top_match is None only "
+            "when action == 'NO_MATCH'"
+        )
     try:
         proposal = _build_confirmed_proposal(entity, top.canonical_id, top.score, reasoning_trace)
         pending_id = enqueue_pending(conn, disposition, entity, proposal, tenant_id)
