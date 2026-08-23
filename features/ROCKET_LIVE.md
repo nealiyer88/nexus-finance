@@ -180,3 +180,16 @@ The build creates a pending-approval queue for entity matches the system can't c
 ### 2026-08-22T21:12:45 · 10B · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
 
 ### 2026-08-22T21:12:46 · 10B · 🚦 full gates PASS — clear to ship
+
+### 2026-08-22T21:12:47 · 10B · ✅ SHIPPED — both reviews PASS, queue flipped, committed (~$4.6984 spent).
+
+### 2026-08-22T21:12:47 · 12 · 🚀 Starting 12 (matcher-orchestrator.md)
+
+### 2026-08-22T21:12:47 · 12 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-22T21:17:46 · 12 · ⏳ API busy — retrying in 26s (attempt 1/3)
+
+### 2026-08-22T21:27:46 · 12 · ⏳ API busy — retrying in 47s (attempt 2/3)
+
+### 2026-08-22T21:35:09 · 12 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The reality check flagged a **mismatch between feature 12's brief and an earlier shipped feature (10b)**: the brief says human-review queue mechanics are out of scope, but 10b built a pending decision store and explicitly expects feature 12 to write to it—meaning code built to this brief will either ignore data 10b created or silently discard review decisions. A human decision is needed: should feature 12 integrate with the queue store, or is that deferred to later work?

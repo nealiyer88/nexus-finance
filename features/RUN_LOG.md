@@ -278,3 +278,10 @@
 | 2026-08-22T21:12:45 | 10b | qb-validation | — | SKIPPED (QB gate off / no QB keywords) |
 | 2026-08-22T21:12:45 | 10b | exercise-gate | hook | SKIPPED (no project exercise script) |
 | 2026-08-22T21:12:46 | 10b | gates:post-integration | — | PASS (features/_logs/10b-gates-post-integration.md) |
+| 2026-08-22T21:12:47 | 10b | feature-cost | — | $4.6984 / $50 |
+| 2026-08-22T21:12:47 | 10b | SHIPPED | rocket | complete |
+| 2026-08-22T21:17:46 | 12 | retry | claude | transient API failure (exit 1) — attempt 1/3, waiting 26s |
+| 2026-08-22T21:27:46 | 12 | retry | claude | transient API failure (exit 1) — attempt 2/3, waiting 47s |
+| 2026-08-22T21:35:08 | 12 | cost:reality-check | claude | $1.6162180000000002 |
+| 2026-08-22T21:35:09 | 12 | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/12-reality-check.md |
+| 2026-08-22T21:35:09 | 12 | reality-check | opus | FLAG (blocked; see features/_reality/12-reality-check.md) |

@@ -44,6 +44,7 @@ Stages 0–6 exist as individual modules but nothing wires them together. The ma
 - **Auto-approval identity (DECIDED).** The Stage 6 writers require an `approved_by` argument and auto-approvals have no human. Use a single fixed system-actor identity, defined as an `UPPER_CASE` module constant in `core/matching/engine.py` (per CLAUDE.md naming) and imported by any other caller — never an inline string literal, so it is greppable and stable across features. The builder does not invent a value: the constant's name and value are fixed here as `AUTO_APPROVAL_ACTOR = "system:matcher-orchestrator"`.
 
 - **Stage 6 dispatch.** There is no `resolve(disposition)` function. Stage 6 ships three decision-specific writers — one for a confirmed match, one for a new canonical entity, one for a rejection — each demanding materially more than a `Disposition` carries (approver identity, alias confidence, edge endpoints, relationship, category metadata, weight, canonical name, entity type, system references). The requirement is: **dispatch to the Stage 6 writer appropriate to the disposition's action, supplying the arguments that writer's signature requires at build time.** Read the signatures; do not assume the argument list from this brief.
+  - **The queued branch is not a no-op.** The dispatch table has a fourth branch — `QUEUE_FOR_REVIEW` — and it must write. See "Pending-decision persistence" below. A dispatch table that enumerates only the three resolution writers leaves every queued decision unpersisted, which is not an edge case: the Stage 5 fallback path converts its result to `QUEUE_FOR_REVIEW`, so a large share of decisions land here.
   - Note the two distinct category axes the writers straddle: `NormalizedEntity.entity_category` is the organization/person axis that Stage 1 and Stage 5 branch on, while `NormalizedEntity.category` is the accounting/psa source axis that Stage 3's weight dispatch uses. The new-entity writer's `entity_category` argument feeds the column that downstream person-detection reads. Confirm which axis each argument wants against the shipped readers before wiring.
   - Similarly, connector `read_entities` takes a source-specific entity type while the canonical id prefix is minted from the canonical entity type. Establish the mapping explicitly in `pipeline.py`.
 
@@ -56,9 +57,17 @@ Stages 0–6 exist as individual modules but nothing wires them together. The ma
   - Resets the Stage 5 call budget at the start of each run
   - Sequential processing in V1 (no parallel/async)
 
+- **Pending-decision persistence: IN SCOPE, and it is a real call site.** Feature 10b (`pending-decision-persistence`) shipped after this brief was first written and delivers the enqueue function in `core/matching/pending_store.py`; 10b's own brief names feature 12 as the caller that wires it. Requirement:
+  - On the `QUEUE_FOR_REVIEW` branch of Stage 6 dispatch, the orchestrator durably persists the decision by calling 10b's enqueue function. The **proposal** argument is the JSON-serializable keyword-argument mapping the orchestrator derived for the Stage 6 writer it *would* have called had the decision been approved — i.e. the queued branch does the same argument derivation as the resolution branch, then hands those arguments to the enqueue call instead of to the writer. **Derive the exact parameter names from the enqueue function's signature at build time**; they are deliberately not transcribed here.
+  - The enqueue function **self-gates on the disposition's action** — it writes nothing for any other action and returns nothing to branch on. The orchestrator therefore adds **no action check of its own** around the call, exactly as it adds none around the training-pair store.
+  - `tenant_id` is threaded through the call, from `MatchContext` / `run_ingestion`'s tenant argument, like every other tenant-scoped stage call.
+  - This includes the Stage 5 failure path above: an entity recorded as queued-for-review with no assessment is a queued decision and is persisted by the same call.
+  - Transaction boundary is the orchestrator's, not the store's — 10b's module never commits or rolls back.
+
 - **Training-pair persistence: IN SCOPE only as a pass-through, with no new code.** The Stage 6 writers already call the training-pair store on every path, and that store self-gates — it writes nothing unless the disposition carries a Stage 5 `call_id` with a matching Stage 5 row. The orchestrator's entire obligation is therefore to pass its reasoning trace into the Stage 6 writer and let the existing call happen; it must neither suppress the call nor add a second persistence path. Any change to the training-pair writer itself is out of scope (that module shipped with the resolution feature).
 
 - **Test suite:** `tests/test_engine.py`, `tests/test_pipeline.py`
+  - **Schema setup is mandatory and comes from files, never Python DDL.** After loading `db/schema_sqlite.sql`, the test connection must also apply 10b's pending-decisions migration and the LLM-training-data migration — without the pending-decisions table the enqueue call raises a missing-table error and the whole queued branch fails at runtime, not in review. Derive both migration filenames **at build time by listing `db/migrations/`** and selecting the SQLite-dialect files by name; no numeric prefix or filename is written into this brief. Follow the path-constant pattern the shipped test modules already use.
   - End-to-end test: load every fixture entity from both shipped connectors into an empty graph via the pipeline. Derive the expected total by counting what the connectors return at test time — do not hard-code it.
   - **Stage 5 must be exercised with an injected fake `LLMClient` and a reset call budget.** No test may construct the default client and **no test makes a live API call** — the fake is passed on every Stage 5 invocation, and the test asserts against the fake's own recorded call count. The per-run budget is reset at the start of each run so it never bounds the batch.
   - Reset the Stage 6 index-staleness flag between runs so run two starts from a known state.
@@ -68,10 +77,10 @@ Stages 0–6 exist as individual modules but nothing wires them together. The ma
 
 - Celery/Redis async queue — V1 runs synchronously
 - Webhook-triggered ingestion — V1 uses manual/scheduled trigger
-- Multi-connector orchestration (run QB + RUDDR in sequence) — that's the ingestion worker (feature 14)
+- Multi-connector orchestration (run QB + RUDDR in sequence) — a later scheduling/worker layer owns that; `run_ingestion` takes one connector per call. No queue row owns it today, so no feature number is cited here.
 - Dashboard integration — separate features
 - **A persisted audit table or audit writer.** There is no audit table in the live SQLite store and no runtime audit writer anywhere; the audit DDL exists in the Postgres schema only and its middleware is a stub. Feature 10a (`postgres-store-bootstrap`) owns standing that path up, and it is BLOCKED. Feature 12 must not create one.
-- Human review queue mechanics — a separate feature owns the queue surface.
+- **The human review queue SURFACE — feature 11.** No API route, no Dash page, no badge count, no list/claim/decide flow. **This exclusion covers the surface only and must not be read as covering the persistence call.** Writing the pending row via 10b's shipped enqueue function is explicitly IN scope (see Pending-decision persistence above); what is out of scope is everything that later reads, displays or resolves that row. A builder who skips the enqueue call because "the review queue is out of scope" has misread this line.
 
 ---
 
@@ -84,6 +93,7 @@ Stages 0–6 exist as individual modules but nothing wires them together. The ma
 - [ ] **Bucket accounting invariant:** the run summary's buckets are pairwise disjoint, every processed entity appears in exactly one, and the bucket counts sum to the ingested total. No per-bucket count is written into the test.
 - [ ] **First-run invariant, NOT a per-bucket number.** The original zero-auto-approvals-on-an-empty-graph criterion is false by construction and has been removed. Verified against the shipped code and fixtures: Stage 1's exact-alias lookup queries SQLite directly and does not consult the in-memory blocking indices, and it treats a canonical name as a seed alias at full confidence. The fixture sets from the shipped connectors contain exact normalized-name collisions. So once the first connector's entities are written, later entities with a colliding normalized name match deterministically above the auto-approve threshold on the *same* run. Assert only the invariant: every entity is accounted for, and no bucket count is asserted against a literal.
 - [ ] **Second-run criterion as a derived proportion:** capture the first run's summary, simulate approvals, re-run, and assert the auto-approved share of the second run is strictly greater than the first run's — comparing the two runs' own numbers. No target number is written into the test.
+- [ ] **Pending-persistence invariant:** after a run, the number of rows persisted to the pending-decisions table equals the run summary's queued bucket count — **both read at test time from the run's own outputs**, with no literal count written into the test or this brief. The test's connection must have the pending-decisions migration applied (see Test suite), or this criterion fails with a missing-table error rather than a count mismatch.
 - [ ] Match type distribution tracked across the paths the orchestrator can emit
 - [ ] Pipeline summary reports entity counts per bucket plus the ingested total
 - [ ] The repo's documented test invocation, scoped to the new test modules, passes — and the assertion is a **collected count greater than zero** parsed from the collection output, not a bare exit code. A deselected-everything run exits 0, which is exactly the silent pass this criterion exists to catch. See CLAUDE.md for the invocation form; bare `pytest` is not on PATH and the direct `.venv/bin/pytest` form fails collection.
@@ -95,6 +105,7 @@ Stages 0–6 exist as individual modules but nothing wires them together. The ma
 ## Dependencies
 
 - [ ] All pipeline stages shipped: deterministic+blocking (7), scoring (8), the fastText signal retrofit (8a), the transactions table and amount signal (8b), threshold+LLM (9), resolution (10) — matching FEATURE_QUEUE.md's row for this feature
+- [ ] **Feature 10b (pending-decision-persistence) — SHIPPED, and a genuine build dependency.** It supplies `core/matching/pending_store.py`'s enqueue function and the pending-decisions migration this feature's queued branch and test schema both require. Its signature is read at build time with `inspect.signature`, never copied from prose. This feature modifies nothing in that module.
 - [ ] Both connectors shipped (5, 6) — pipeline needs real connector output
 - [ ] Normalizer (3) — first step in pipeline
 
@@ -132,6 +143,10 @@ def match(incoming: NormalizedEntity, ctx: MatchContext) -> MatchResult:
     # Stage 6: dispatch to the writer appropriate to disposition.action,
     # supplying that writer's required arguments, with AUTO_APPROVAL_ACTOR
     # as the approver on the auto path and the reasoning trace threaded in.
+    # On the QUEUE_FOR_REVIEW branch: derive the same write arguments, then
+    # hand them to feature 10b's enqueue function as the proposal, tenant
+    # scope threaded through. That function self-gates on the action, so no
+    # action check is written here.
     return MatchResult(...)
 ```
 
