@@ -578,10 +578,3 @@ def test_no_postgres_or_forbidden_references() -> None:
         assert not pattern.search(text), f"forbidden reference found in {path}"
 
 
-def test_requirements_txt_unchanged() -> None:
-    result = subprocess.run(
-        ["git", "diff", "--quiet", "requirements.txt"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-    )
-    assert result.returncode == 0

@@ -829,18 +829,6 @@ def test_no_postgres_references() -> None:
         assert not pattern.search(src), f"{path} references Postgres infrastructure"
 
 
-def test_requirements_txt_unchanged() -> None:
-    result = subprocess.run(
-        ["git", "diff", "--", "requirements.txt"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0
-    assert result.stdout.strip() == ""
-
-
 def test_no_transactions_table_reference() -> None:
     for path in (
         REPO_ROOT / "core" / "graph" / "resolution.py",

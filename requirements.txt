@@ -4,6 +4,7 @@ uvicorn[standard]==0.30.0
 
 # Database
 supabase==2.9.0
+psycopg[binary]==3.2.3
 
 # Matching engine
 rapidfuzz==3.9.0

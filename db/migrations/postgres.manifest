@@ -1,0 +1,6 @@
+# Postgres migration manifest, applied in order by scripts/migrate_pg.py.
+# Blank lines and lines starting with # are ignored. New migrations are
+# appended at the end — never reordered, never inserted in the middle.
+001_canonical_schema.sql
+002_llm_training_data.sql
+003_transactions.sql
