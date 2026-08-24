@@ -241,3 +241,10 @@ The matcher orchestrator (feature 12) is the coordinator that takes entities fro
 
 ### 2026-08-23T09:16:22 · 10A · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
 The infrastructure blueprint passed most structural checks, but three specific requirements in the brief don't align with the actual codebase and need clarification before work can begin: the disposition vocabulary the QA test expects doesn't exist in code as specified, a database-column matching pattern won't find the actual columns, and documentation files already violate the secret-storage rule the brief sets. A human decision on each point is needed to unblock the build.
+
+### 2026-08-23T09:21:08 · 10A · 🚀 Starting 10a (postgres-store-bootstrap.md)
+
+### 2026-08-23T09:21:08 · 10A · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-23T09:47:36 · 10A · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The Postgres bootstrap feature (10a) is flagged and cannot proceed as specified. The testing requirements are arithmetically impossible—the spec requires removing two tests but adding at least four new ones, making the success criterion contradictory. Three specific decisions are needed: how the tenant-creation function should handle missing arguments, how to restate the test-count criterion correctly, and how this feature coordinates with Stage 6 code that was shipped in a later feature.
