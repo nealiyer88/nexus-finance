@@ -40,7 +40,7 @@ This feature **retires a named set of shipped guard tests** and edits no other f
 **The requirements-diff guards ARE retired, in the same commit that adds the driver pin.** Feature 10's shipped suite — and, since 10b landed, feature 10b's suite as well — contains tests asserting the working-tree diff of `requirements.txt` is empty. This feature must add a driver pin to that exact file. **The two cannot hold in one working tree**, and the gate runs pre-commit against the working tree, so the build fails outright. Committing the pin separately would only launder the diff to empty and defeat the guard's purpose; that is explicitly forbidden.
 
 - **Retire every shipped test that asserts the `requirements.txt` diff is empty**, in the **same commit** that adds the pin. Derive the set at build time by grepping `tests/` for tests that shell out to `git diff` against `requirements.txt` and assert emptiness — do not rely on this brief for the list; at minimum it spans feature 10's suite and feature 10b's suite, and a later feature may have added another.
-- Each retired test is **deleted or explicitly skipped with a reason naming this feature**, so a reviewer can enumerate the retired set from the diff alone. No count of retired tests is written anywhere.
+- Each retired test is **deleted outright — never skipped**. A skipped guard still matches the grep in the success criteria below, so skipping would contradict the criterion; deletion is the only permitted form of retirement. The retired set is enumerable from the diff alone. No count of retired tests is written anywhere.
 - **Feature 10's Postgres-token grep-guard is NOT touched here.** This feature adds no call site into feature 10's shipped modules; 10c owns that edit and that guard's survival assertion.
 
 ### In Scope
@@ -93,8 +93,10 @@ This feature **retires a named set of shipped guard tests** and edits no other f
   **THE TERMINAL VOCABULARY — DECIDED, NOT TO BE RE-LITIGATED.** The terminal set is **the value list of the `status` `CHECK` constraint feature 10b ships in its pending-decisions SQLite migration, minus that constraint's single non-terminal "still pending" value**. 10b already reuses this vocabulary for `approval_decisions`, so keying on it needs no translation layer. Two earlier revisions tried to source it elsewhere; do not reopen the question.
   - **Locate the migration by listing `db/migrations/` at build time** and selecting the SQLite-dialect pending-decisions migration. **This brief writes neither its filename nor its prefix.** **Parse the `CHECK`'s value list out of that file at build time** and drop the non-terminal value; the remainder is `TERMINAL_SET`. That parse, not this brief, is the authority — **no value is transcribed into this brief, into code, or into a test as a literal.** Nothing here edits 10b's migration, module, or tests.
   - **Do not key on `core.matching.types.Action`.** It is a `typing.Literal` of Stage 4 **routing** bands, at least two of which denote *not yet decided*; it is not an `Enum`, so it has no member iteration and no `terminal` attribute.
-  - Read the allowed set out of `approval_decisions.disposition`'s `CHECK` in `db/schema.sql` **by grep at test time**, never as a literal list. The invariant is a **subset assertion in both directions, never a set equality**: `set(MAPPING.values()) <= CHECK_SET` and `set(MAPPING.keys()) <= TERMINAL_SET`, both right-hand sides derived at run time. **No producer-set equality assertion exists anywhere in this feature** — that construct made this criterion vacuous twice.
-  - **A CHECK value may have no in-tree producer, and that is expected.** Where a value is emitted by nothing in `core/`, `api/`, or `dashboard/` — verify by grep, do not name it here — it stays in the CHECK set and is **unmapped by design**: the mapping has no key for it and **no producer may be invented**. Because both invariants are subset assertions, an unmapped value fails nothing.
+  - Read the allowed set out of `approval_decisions.disposition`'s `CHECK` in `db/schema.sql` **by grep at test time**, never as a literal list. Keys and values are **different obligations**: `set(MAPPING.keys()) == TERMINAL_SET` is a **set EQUALITY**, so an empty or partial mapping fails loudly; `set(MAPPING.values()) <= CHECK_SET` stays a **subset** assertion. Both right-hand sides are derived at run time. **No producer-set assertion of any kind exists anywhere in this feature** — that construct made this criterion vacuous twice.
+  - **The mapping must COVER the full terminal set.** Every terminal value is a key. There is no exclusion rule of any kind: nothing is left out on the grounds of having no in-tree producer, and no producer may be invented either. Producer presence is simply irrelevant to this mapping.
+  - **This is an identity mapping — there is no translation work to do.** The terminal set and the `disposition` `CHECK` set **coincide** in this repo, so each terminal value maps to the identically-spelled CHECK value. Do not go hunting for a transformation that is not there, and do not add a case-normalization or aliasing layer. Confirm the coincidence at build time by comparing the two derived sets rather than by transcription; if they ever diverge, the two invariants above still govern — keys equal the terminal set, values stay inside the CHECK set.
+  - **NON-VACUITY — asserted directly.** `MAPPING` must be **non-empty**, and that is asserted on its own line, independently of the set assertions. A subset assertion is satisfied vacuously by the empty set; the key equality plus this explicit non-emptiness check make an empty or quietly hollowed-out mapping fail.
 
 - **Feature 16 seam.** Feature 16 binds `DEFAULT_TENANT_ID = BOOTSTRAP_TENANT_ID` and asserts **identity**. Nothing in this feature may make `BOOTSTRAP_TENANT_ID` require a database to import, rename it, or turn it into a computed value.
 
@@ -107,7 +109,7 @@ This feature **retires a named set of shipped guard tests** and edits no other f
 - **Mirroring feature 10b's pending-decisions table into Postgres**, and any edit to 10b's module, migration, tests, or to the parity test's shared-table literal.
 - **Rewriting any shipped migration** to remove its `DROP TABLE ... CASCADE` block; **any `db/schema.sql` type change** (feature 2 owns those); **down-migrations / rollback** (forward-only).
 - **Connection pooling, ORM, async, or any vendor SDK.** One driver, one `connect()`; `supabase==2.9.0` stays unimported.
-- **A producer for the unmapped `disposition` CHECK value.**
+- **Inventing an in-tree producer for any `disposition` CHECK value.** The mapping covers the terminal set regardless of what emits those values today; adding emitters is not this feature's work.
 
 ---
 
@@ -122,10 +124,10 @@ This feature **retires a named set of shipped guard tests** and edits no other f
 
 **Guard retirement (no database required):**
 
-- [ ] **Restated "feature 10's suite still passes":** every test in feature 10's shipped suite that this feature does not explicitly retire passes under `.venv/bin/python -m pytest tests/test_resolution.py -x --tb=short`, with `DATABASE_URL` unset, and its collected count is greater than zero. The retired set is enumerable from the diff — each retired test is deleted or skipped with a reason naming this feature. No count of retired tests appears in any test or comment.
+- [ ] **Restated "feature 10's suite still passes":** every test in feature 10's shipped suite that this feature does not explicitly retire passes under `.venv/bin/python -m pytest tests/test_resolution.py -x --tb=short`, with `DATABASE_URL` unset, and its collected count is greater than zero. The retired set is enumerable from the diff — each retired test is **deleted**, never skipped. No count of retired tests appears in any test or comment.
 - [ ] The same holds for feature 10b's suite: `.venv/bin/python -m pytest tests/test_pending_decisions.py -x --tb=short` passes for every test not explicitly retired, with a collected count greater than zero.
 - [ ] **No requirements-diff guard remains that contradicts the pin:** a test greps `tests/` for any test asserting the `requirements.txt` diff is empty and asserts the result set is empty. Derived by grep, never against an expected number.
-- [ ] The driver pin and the guard retirements appear in the **same commit** — asserted by inspecting that commit's changed-path set, which contains both `requirements.txt` and every file holding a retired guard.
+- [ ] **REVIEWER / CHECKLIST OBLIGATION — not a pytest assertion.** The driver pin and the guard retirements must land in the **same commit**. The reviewer confirms, at review time, that the commit's changed-path set contains both `requirements.txt` and every file that held a retired guard. This is deliberately a human step: the gate runs **pre-commit against the working tree**, where that commit does not yet exist, so no test in this suite can inspect it — any attempt to write one would be asserting against something unavailable. The substance is unchanged and unconditional: pin and retirements land together, and committing the pin separately to launder the diff is forbidden.
 
 **Driver + connection (no database required):**
 
@@ -146,7 +148,9 @@ This feature **retires a named set of shipped guard tests** and edits no other f
 
 **Disposition mapping (no database required):**
 
-- [ ] A test parses the `CHECK` set out of `db/schema.sql` by grep, parses `TERMINAL_SET` out of the `status` CHECK in 10b's pending-decisions SQLite migration (located by listing `db/migrations/`, never by filename) minus the non-terminal value, then asserts `set(MAPPING.values()) <= CHECK_SET` **and** `set(MAPPING.keys()) <= TERMINAL_SET`. Both are subset assertions; no set equality is asserted and no set appears as a literal in the test.
+- [ ] A test parses the `CHECK` set out of `db/schema.sql` by grep, parses `TERMINAL_SET` out of the `status` CHECK in 10b's pending-decisions SQLite migration (located by listing `db/migrations/`, never by filename) minus the non-terminal value, then asserts `set(MAPPING.keys()) == TERMINAL_SET` (**equality** — an empty or partial mapping fails here) **and** `set(MAPPING.values()) <= CHECK_SET` (subset). No set appears as a literal in the test.
+- [ ] **Non-vacuity:** a separate assertion requires `MAPPING` to be non-empty, standing on its own so no future edit can hollow the mapping out behind a vacuously-true subset check.
+- [ ] **Identity, derived not transcribed:** the same test asserts the two parsed sets coincide and that every key maps to a value equal to itself — confirming the mapping is the identity and that no translation layer was introduced.
 
 **Secret hygiene (no database required):**
 
@@ -182,10 +186,10 @@ This feature **retires a named set of shipped guard tests** and edits no other f
 2. **Treat `DATABASE_URL` as a live secret regardless of what the value contains**, and set an explicit connect timeout from a named module-level constant. This brief pins no timeout value; no code or test may assume any particular latency.
 3. **Every test command is `.venv/bin/python -m pytest ...`.** Bare `pytest` is not on PATH, and `.venv/bin/pytest` does not put the repo root on `sys.path`.
 4. **An unregistered or non-matching marker fails silently, not loudly.** Any criterion that "passes" by selecting zero tests is false signal — hence the collected-count-greater-than-zero assertions.
-5. **Retire the requirements-diff guards in the same commit as the pin.** Do not commit the pin separately to launder the diff. Enumerate the retired set in the diff; write no count of it anywhere.
+5. **Retire the requirements-diff guards in the same commit as the pin — by deleting them, never by skipping them.** Do not commit the pin separately to launder the diff. Same-commit landing is a reviewer obligation, not a pytest assertion, because the gate runs pre-commit. Enumerate the retired set in the diff; write no count of it anywhere.
 6. **Never claim a shipped migration is idempotent.** Idempotency here means *the runner does not re-run an applied file*. Derive the destructive set by grep whenever you need it.
 7. **Migration prefixes are shared with SQLite-only migrations.** Compute the next free prefix over the whole directory, `_sqlite` files included. Never write a number or a migration filename into a brief or a comment.
-8. **Do not key approval dispositions on `core.matching.types.Action`.** Key on the terminal vocabulary decided above, parsed at build time; normalize case into the CHECK vocabulary. Both mapping invariants are subset assertions.
+8. **Do not key approval dispositions on `core.matching.types.Action`.** Key on the terminal vocabulary decided above, parsed at build time. The mapping **covers the whole terminal set** (keys equal it, asserted as an equality), its values are a subset of the CHECK set, and it is asserted non-empty. The two sets coincide, so it is an identity mapping — add no translation or case-normalization layer.
 9. **Do not open a connection anywhere in this feature's tests.** If a criterion needs a live server, it belongs to 10c.
 10. **Cite symbols, not coordinates.** No `file.py:NNN`, no counts, no "exactly N" claims about the tree in any code, comment, test, or log. Every quantitative check is an invariant computed at build or test time.
 
