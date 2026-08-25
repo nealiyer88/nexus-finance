@@ -34,6 +34,8 @@ from __future__ import annotations
 import sqlite3
 from typing import Any, Optional
 
+from core.graph.approvals import record_approval_decision
+from core.graph.audit import log_resolution
 from core.graph.entity_store import (
     add_alias,
     add_system_reference,
@@ -42,6 +44,8 @@ from core.graph.entity_store import (
     get_canonical_name_and_category,
     upsert_edge,
 )
+from core.graph.pg import connect as pg_connect
+from core.graph.pg import is_available as pg_is_available
 from core.ingestion.normalizer import NormalizedEntity
 from core.matching.training_data import TrainingPair, store_training_pair
 from core.matching.types import Disposition
@@ -168,6 +172,44 @@ def resolve_match(
     edge. Returns `canonical_id`.
     """
     try:
+        if pg_is_available():
+            # Operational-store audit + approval capture happens before the
+            # local graph mutation below, so a connect timeout surfaces
+            # here rather than silently skipping past it. Re-drive safety
+            # comes from the idempotency of the writes that follow, not
+            # from cross-store atomicity.
+            store_conn = pg_connect()
+            try:
+                top = disposition.top_match
+                category_pair = f"{source_category}:{target_category}"
+                log_resolution(
+                    store_conn,
+                    canonical_id,
+                    entity.raw_name,
+                    "CONFIRMED",
+                    alias_confidence,
+                    top.signal_breakdown if top is not None else {},
+                    category_pair,
+                    approved_by,
+                    tenant_id,
+                )
+                record_approval_decision(
+                    store_conn,
+                    source_node,
+                    target_node,
+                    "approved",
+                    top.signal_breakdown if top is not None else {},
+                    top.graph_evidence if top is not None else {},
+                    category_pair,
+                    reasoning_trace,
+                    alias_confidence,
+                    approved_by,
+                    tenant_id,
+                )
+                store_conn.commit()
+            finally:
+                store_conn.close()
+
         add_alias(
             conn,
             canonical_id,
