@@ -1,7 +1,9 @@
 """Requirements/env/guard-retirement checks for feature 10a.
 
-No database required. `git diff` here is only ever used to inspect the
-committed change to `requirements.txt`, never to open a connection.
+No database required, and no `git diff` between commits: every
+requirements assertion below reads the current contents of
+`requirements.txt`, so no commit landing after this feature can
+invalidate it.
 """
 
 from __future__ import annotations
@@ -14,33 +16,58 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 _DRIVER_PIN_RE = re.compile(r"^psycopg\[binary\]==")
 
+# `name`, optional `[extras]`, `==`, `version` — an exact pin, nothing looser.
+_EXACT_PIN_RE = re.compile(
+    r"^(?P<name>[A-Za-z0-9._-]+)(?P<extras>\[[A-Za-z0-9,._-]+\])?==(?P<version>[A-Za-z0-9._+!-]+)$"
+)
 
-def _requirements_diff_lines() -> tuple[list[str], list[str]]:
-    """Return (added_lines, removed_lines) for requirements.txt vs HEAD."""
-    result = subprocess.run(
-        ["git", "diff", "HEAD", "--", "requirements.txt"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    added, removed = [], []
-    for line in result.stdout.splitlines():
-        if line.startswith("+++") or line.startswith("---"):
+
+def _requirement_lines() -> list[str]:
+    """Every active (non-blank, non-comment) line of requirements.txt."""
+    text = (REPO_ROOT / "requirements.txt").read_text()
+    lines = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
             continue
-        if line.startswith("+"):
-            added.append(line[1:])
-        elif line.startswith("-"):
-            removed.append(line[1:])
-    return added, removed
+        lines.append(line)
+    return lines
 
 
-def test_requirements_diff_adds_only_the_driver_pin() -> None:
-    added, removed = _requirements_diff_lines()
-    assert added, "expected requirements.txt to gain at least one line"
-    assert removed == [], f"expected no removed lines, got: {removed}"
-    for line in added:
-        assert _DRIVER_PIN_RE.match(line), f"unexpected added line: {line}"
+def test_requirements_adds_only_the_driver_pin() -> None:
+    """requirements.txt carries the Postgres driver, exactly pinned, once —
+    and every other entry beside it is itself an exact pin.
+
+    Asserted against the file as it stands rather than against a diff
+    between two commits: a diff-based check silently re-breaks the moment
+    any later commit lands on top of the feature. No version literal and
+    no expected requirement count appear here — both are derived from the
+    file at test time.
+    """
+    lines = _requirement_lines()
+    assert lines, "requirements.txt has no active requirement lines"
+
+    parsed = []
+    for line in lines:
+        match = _EXACT_PIN_RE.match(line)
+        assert match is not None, f"requirement is not an exact `name==version` pin: {line}"
+        parsed.append(match)
+
+    drivers = [m for m in parsed if m.group("name").lower() == "psycopg"]
+    assert len(drivers) == 1, f"expected exactly one psycopg requirement, got: {[m.group(0) for m in drivers]}"
+
+    driver = drivers[0]
+    assert driver.group("extras") == "[binary]", (
+        f"psycopg must request the binary extra, got: {driver.group(0)}"
+    )
+    assert _DRIVER_PIN_RE.match(driver.group(0)), f"driver line not pinned: {driver.group(0)}"
+    assert driver.group("version"), "psycopg[binary] must carry a version"
+
+    # The driver the feature added is the only Postgres driver present.
+    names = {m.group("name").lower() for m in parsed}
+    assert names.isdisjoint({"pg8000", "asyncpg", "psycopg2", "psycopg2-binary"}), (
+        f"a second Postgres driver crept in: {sorted(names)}"
+    )
 
 
 def test_requirements_txt_has_exactly_one_postgres_driver_pin() -> None:

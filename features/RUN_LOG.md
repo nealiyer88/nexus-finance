@@ -313,3 +313,10 @@
 | 2026-08-23T23:48:16 | 10a | cost:reality-check | claude | $1.3039524999999998 |
 | 2026-08-23T23:48:16 | 10a | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/10a-reality-check.md |
 | 2026-08-23T23:48:16 | 10a | reality-check | opus | FLAG (blocked; see features/_reality/10a-reality-check.md) |
+| 2026-08-23T23:56:35 | 10a | cost:reality-check | claude | $0.9416795 |
+| 2026-08-23T23:56:36 | 10a | reality-check | opus | GO |
+| 2026-08-23T23:58:28 | 10a | cost:promptgen | claude | $0.74044 |
+| 2026-08-23T23:58:28 | 10a | prompt-gen | opus | done |
+| 2026-08-24T00:35:00 | 10a | retry | claude | transient failure but the tree changed — NOT retrying (partial build goes to review+fix) |
+| 2026-08-24T00:35:00 | 10a | cost:build-session | claude | $1.9016644 |
+| 2026-08-24T00:35:00 | 10a | BLOCKED | — | build session exit=1 |

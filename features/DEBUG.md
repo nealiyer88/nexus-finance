@@ -41,3 +41,6 @@ Reason: reality check FLAG — brief no longer matches the repo; report: feature
 ## 2026-08-23T23:48:16 — 10a BLOCKED
 Reason: reality check FLAG — brief no longer matches the repo; report: features/_reality/10a-reality-check.md
 
+## 2026-08-24T00:35:00 — 10a BLOCKED
+Reason: build session exit=1
+

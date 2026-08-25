@@ -39,8 +39,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS_DIR = REPO_ROOT / "db" / "migrations"
 MANIFEST_PATH = MIGRATIONS_DIR / "postgres.manifest"
 
-_CANONICAL_TABLE_MARKER = re.compile(
-    r"CREATE TABLE IF NOT EXISTS canonical_entities", re.IGNORECASE
+# A migration is DESTRUCTIVE when it contains an unconditional `DROP TABLE`
+# statement. The set is derived by scanning the migration text at the moment
+# of use — never from a hardcoded filename list. `IF EXISTS` only suppresses
+# the error when the table is absent; it does not make the DROP conditional.
+_DROP_TABLE_RE = re.compile(
+    r"^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([^\s;]+)",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 
@@ -58,8 +63,25 @@ def parse_manifest(path: Path) -> list[str]:
     return filenames
 
 
-def _is_canonical_schema_file(path: Path) -> bool:
-    return bool(_CANONICAL_TABLE_MARKER.search(path.read_text()))
+def dropped_tables(sql: str) -> list[str]:
+    """Return the table names an unconditional `DROP TABLE` statement drops.
+
+    Table names are enumerated by grep at the moment of use, so no migration
+    filename, prefix, or table name is ever hardcoded here.
+    """
+    names: list[str] = []
+    for match in _DROP_TABLE_RE.finditer(sql):
+        raw = match.group(1).strip().strip('"')
+        # Strip any schema qualifier and surrounding quoting.
+        name = raw.split(".")[-1].strip('"')
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def is_destructive_migration(path: Path) -> bool:
+    """True when the migration file contains an unconditional `DROP TABLE`."""
+    return bool(dropped_tables(path.read_text()))
 
 
 def _table_exists(conn, table_name: str) -> bool:
@@ -115,15 +137,23 @@ def run(dry_run: bool = False) -> int:
                 print(f"skipped {filename}")
                 continue
 
-            if _is_canonical_schema_file(path) and _table_exists(conn, "canonical_entities"):
+            sql = path.read_text()
+
+            # DESTRUCTIVE-FILE GUARD. This file is not recorded in
+            # schema_migrations (checked above). If it drops tables that
+            # already exist, the database was created some other way and
+            # applying this file would silently destroy data.
+            existing_targets = [
+                table for table in dropped_tables(sql) if _table_exists(conn, table)
+            ]
+            if existing_targets:
                 print(
-                    f"refusing to apply {filename}: canonical_entities already "
-                    "exists and is not recorded in schema_migrations; assuming "
-                    "it holds data"
+                    f"refusing to apply {filename}: it unconditionally drops "
+                    f"{', '.join(existing_targets)}, which already exist and are "
+                    "not recorded in schema_migrations; assuming they hold data"
                 )
                 return 1
 
-            sql = path.read_text()
             with conn.cursor() as cur:
                 cur.execute(sql)
                 cur.execute(
