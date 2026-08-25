@@ -227,34 +227,55 @@ def test_resolve_match_writes_audit_and_approval_rows() -> None:
     finally:
         pg_conn.close()
 
-    resolve_match(
-        sconn,
-        disp,
-        entity,
-        canonical_id=canonical_a,
-        alias_confidence=0.9,
-        source_node=canonical_b,
-        target_node=canonical_a,
-        relationship="SAME_AS",
-        source_category="psa",
-        target_category="accounting",
-        weight=0.9,
-        approved_by="user_e2e",
-        tenant_id=None,
-    )
-
-    pg_conn = pg.connect()
     try:
-        with pg_conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM audit_log")
-            audit_after = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM approval_decisions")
-            approval_after = cur.fetchone()[0]
-    finally:
-        pg_conn.close()
+        resolve_match(
+            sconn,
+            disp,
+            entity,
+            canonical_id=canonical_a,
+            alias_confidence=0.9,
+            source_node=canonical_b,
+            target_node=canonical_a,
+            relationship="SAME_AS",
+            source_category="psa",
+            target_category="accounting",
+            weight=0.9,
+            approved_by="user_e2e",
+            tenant_id=None,
+        )
 
-    assert audit_after == audit_before + 1
-    assert approval_after == approval_before + 1
+        pg_conn = pg.connect()
+        try:
+            with pg_conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM audit_log")
+                audit_after = cur.fetchone()[0]
+                cur.execute("SELECT COUNT(*) FROM approval_decisions")
+                approval_after = cur.fetchone()[0]
+        finally:
+            pg_conn.close()
+
+        assert audit_after == audit_before + 1
+        assert approval_after == approval_before + 1
+    finally:
+        # `resolve_match` writes through its own internal Postgres
+        # connection (it is production code, not test-fixture-managed),
+        # so the rows it commits here are real and must be explicitly
+        # cleaned up — commit-then-clean, same pattern as
+        # tests/test_pg_bootstrap.py.
+        cleanup_conn = pg.connect()
+        try:
+            with cleanup_conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM audit_log WHERE resource_id = %s", (canonical_a,)
+                )
+                cur.execute(
+                    "DELETE FROM approval_decisions "
+                    "WHERE entity_pair_a = %s AND entity_pair_b = %s",
+                    (canonical_b, canonical_a),
+                )
+            cleanup_conn.commit()
+        finally:
+            cleanup_conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -326,11 +347,20 @@ def test_reconcile_reports_informational_only_for_audit_row_with_no_graph_mutati
         pconn.commit()
 
         result = reconcile(sconn, pconn, pg.BOOTSTRAP_TENANT_ID, watermark=_SAFE_WATERMARK)
-    finally:
-        pconn.close()
 
-    assert canonical_id not in result.uncovered
-    assert ghost_id in result.informational
+        assert canonical_id not in result.uncovered
+        assert ghost_id in result.informational
+    finally:
+        # `log_resolution` commits real rows above (commit-then-clean,
+        # same pattern as tests/test_pg_bootstrap.py) — remove them
+        # regardless of assertion outcome.
+        with pconn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM audit_log WHERE resource_id IN (%s, %s)",
+                (canonical_id, ghost_id),
+            )
+        pconn.commit()
+        pconn.close()
 
 
 def test_main_exits_nonzero_on_uncovered_identifier(tmp_path) -> None:

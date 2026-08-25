@@ -290,3 +290,26 @@ The build step's core premise is broken: the code was supposed to skip database 
 
 ### 2026-08-24T21:38:37 · 10C · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
 Reality check verified that most of the database and migration setup matches what was planned, but flagged one blocking issue: the test designed to ensure database credentials don't leak into the code will fail no matter what, because the username is part of your machine's file path, which is already in committed files and test output. A human needs to decide whether to exclude the username from the check or scope it differently so the feature can pass.
+
+### 2026-08-24T21:43:37 · 10C · 🚀 Starting 10c (postgres-writers-and-migrations.md)
+
+### 2026-08-24T21:43:37 · 10C · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-24T21:47:00 · 10C · ✅ reality check GO — brief matches the current repo
+
+### 2026-08-24T21:49:19 · 10C · 📝 Wrote the build prompt
+The build enables PostgreSQL as a secondary audit and approval store for the matching pipeline, creating three new modules that safely log decisions without exposing database credentials. It wires these writers into Stage 6 of the resolution process, adds integration tests, and includes a reconciliation script that verifies audit coverage against the primary SQLite graph store.
+
+### 2026-08-24T21:50:04 · 10C · 🔨 Builder starting — code + tests + commit
+
+### 2026-08-24T22:03:27 · 10C · 🧹 fast gates PASS
+
+### 2026-08-24T22:03:27 · 10C · 🔍 qa review running
+
+### 2026-08-24T22:06:12 · 10C · 🔍 code review running
+
+### 2026-08-24T22:07:54 · 10C · 🧪 review round 1 — QA=PASS Code=FAIL
+### 22:08:03 · 10c · 🩹 fixing: starting fix pass
+### 22:08:51 · 10c · 🩹 fixing: [CR-BLOCKING-1] test data pollution in test_audit_pg.py — added commit-then-clean cleanup
+### 22:10:00 · 10c · ✅ fix verified: 487 passed, no test residue
+### 22:10:09 · 10c · 📝 fix report written
