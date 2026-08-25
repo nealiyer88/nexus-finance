@@ -30,3 +30,23 @@ def pg_conn():
     finally:
         conn.rollback()
         conn.close()
+
+
+@pytest.fixture(autouse=True)
+def _suppress_live_postgres_writes(request, monkeypatch):
+    """Non-integration tests never reach live Postgres as a side effect.
+
+    Stage 6's call site in `core.graph.resolution` gates on
+    `pg_is_available()`. In any environment where `DATABASE_URL` is
+    configured (this repo's documented `.env` setup), that gate is
+    unconditionally True, so a plain unit test exercising
+    `resolve_match`/`engine.match()` against an in-memory SQLite fixture
+    would otherwise fire real, non-idempotent inserts into a live
+    `audit_log`/`approval_decisions`. Force the gate closed for every
+    test not explicitly marked `integration` — those tests use the
+    `pg_conn` fixture (rollback-wrapped) or the rollback-exempt
+    runner-execution pattern in `test_pg_bootstrap.py`, and opt in to
+    live Postgres on purpose via `pytestmark`.
+    """
+    if "integration" not in request.node.keywords:
+        monkeypatch.setattr("core.graph.resolution.pg_is_available", lambda: False)

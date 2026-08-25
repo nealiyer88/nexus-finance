@@ -321,3 +321,11 @@ The build enables PostgreSQL as a secondary audit and approval store for the mat
 ### 2026-08-24T22:13:14 · 10C · 🧪 review round 2 — QA=PASS Code=FAIL
 ### 22:13:57 · 10c · 🩹 fixing: [CODE-001] missing coverage-not-equality test for reconcile_stores.py
 ### 22:14:22 · 10c · ✅ fix committed: added coverage-not-equality test, 488 passed
+
+### 2026-08-24T22:14:35 · 10C · 🔍 qa review running
+
+### 2026-08-24T22:17:48 · 10C · 🔍 code review running
+
+### 2026-08-24T22:19:23 · 10C · 🧪 review round 3 — QA=FAIL Code=PASS
+### 22:19:48 · 10c · 🩹 fixing: QA-001 live Postgres pollution from non-integration tests
+### 22:20:44 · 10c · 🩹 fixed: QA-001 (autouse pg suppression fixture), QA-002 (empty-set exit-code test) — 489 passed

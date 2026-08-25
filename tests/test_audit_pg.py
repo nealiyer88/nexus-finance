@@ -294,6 +294,25 @@ def test_reconcile_non_vacuity_gate_raises_on_empty_sqlite_set() -> None:
         pconn.close()
 
 
+def test_main_exits_nonzero_on_empty_sqlite_set(tmp_path) -> None:
+    _require_pg()
+    from scripts.reconcile_stores import main as reconcile_main
+
+    db_path = tmp_path / "graph.sqlite"
+    sconn = sqlite3.connect(str(db_path))
+    sconn.executescript(SQLITE_SCHEMA.read_text())
+    sconn.commit()
+    sconn.close()
+
+    exit_code = reconcile_main(
+        [
+            "--sqlite-path", str(db_path),
+            "--tenant-id", pg.BOOTSTRAP_TENANT_ID,
+        ]
+    )
+    assert exit_code == 1
+
+
 def test_reconcile_reports_uncovered_identifier() -> None:
     _require_pg()
     sconn = _sqlite_conn()
