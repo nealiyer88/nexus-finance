@@ -347,3 +347,6 @@
 | 2026-08-24T22:21:54 | 10c | cost:review-qa | claude | $0.5356510000000001 |
 | 2026-08-24T22:23:42 | 10c | cost:review-code | claude | $0.7074626 |
 | 2026-08-24T22:23:42 | 10c | BLOCKED | — | reviews still FAIL after 3 fix rounds |
+| 2026-08-24T22:46:50 | 16 | cost:reality-check | claude | $1.4744390000000003 |
+| 2026-08-24T22:46:50 | 16 | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/16-reality-check.md |
+| 2026-08-24T22:46:50 | 16 | reality-check | opus | FLAG (blocked; see features/_reality/16-reality-check.md) |

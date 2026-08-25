@@ -337,3 +337,10 @@ The build enables PostgreSQL as a secondary audit and approval store for the mat
 ### 2026-08-24T22:23:42 · 10C · 🧪 review round 4 — QA=PASS Code=FAIL
 
 ### 2026-08-24T22:23:42 · 10C · 🛑 HALTED — reviews FAIL after 3 fix rounds. Human needed.
+
+### 2026-08-24T22:43:16 · 16 · 🚀 Starting 16 (connectors-audit-infra.md)
+
+### 2026-08-24T22:43:16 · 16 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-24T22:46:50 · 16 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+A reality check on the infrastructure feature found that all the required building blocks are in place, but three of the success criteria can't actually be tested as written—they either conflict with existing tests that are still running, make assumptions about database behavior that don't work with how the code is structured, or depend on setup that the code actively prevents. The team needs to adjust these three criteria to make them observable and realistic.
