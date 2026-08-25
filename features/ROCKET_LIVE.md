@@ -344,3 +344,28 @@ The build enables PostgreSQL as a secondary audit and approval store for the mat
 
 ### 2026-08-24T22:46:50 · 16 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
 A reality check on the infrastructure feature found that all the required building blocks are in place, but three of the success criteria can't actually be tested as written—they either conflict with existing tests that are still running, make assumptions about database behavior that don't work with how the code is structured, or depend on setup that the code actively prevents. The team needs to adjust these three criteria to make them observable and realistic.
+
+### 2026-08-24T22:55:59 · 16 · 🚀 Starting 16 (connectors-audit-infra.md)
+
+### 2026-08-24T22:55:59 · 16 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-24T22:58:18 · 16 · ✅ reality check GO — brief matches the current repo
+
+### 2026-08-24T23:00:32 · 16 · 📝 Wrote the build prompt
+Feature 16 builds the Dash dashboard shell and connects it to Postgres via three middleware layers: tenant resolution (header→env→default precedence), audit capture (async queue off the request path), and a connectors API that accepts manual sync jobs. The work adds a database migration to track sync status and error messages, replaces placeholder files in the dashboard and API routers with full implementations, and gates startup on confirming that the seeded tenant row exists in the database.
+
+### 2026-08-24T23:00:44 · 16 · 🔨 Builder starting — code + tests + commit
+### 23:01:09 · 16 · 🔨 building
+### 23:12:09 · 16 · 🧪 tests green (543 passed)
+
+### 2026-08-24T23:12:24 · 16 · 🧹 fast gates PASS
+
+### 2026-08-24T23:12:24 · 16 · 🔍 qa review running
+
+### 2026-08-24T23:13:34 · 16 · 🔍 code review running
+
+### 2026-08-24T23:14:53 · 16 · 🧪 review round 1 — QA=PASS Code=PASS
+
+### 2026-08-24T23:14:53 · 16 · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
+
+### 2026-08-24T23:14:58 · 16 · 🚦 full gates PASS — clear to ship

@@ -39,3 +39,9 @@ Brief: features/pipeline/matcher-orchestrator.md
 Tests: 421 passed
 Reviews: QA PASS (blind), Code PASS
 Gates: QB=NOT RUN, Exercise=SKIPPED
+
+## 2026-08-24 — 16 (shipped by rocket)
+Brief: features/infrastructure/connectors-audit-infra.md
+Tests: 543 passed
+Reviews: QA PASS (blind), Code PASS
+Gates: QB=NOT RUN, Exercise=SKIPPED
