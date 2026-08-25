@@ -320,3 +320,6 @@
 | 2026-08-24T00:35:00 | 10a | retry | claude | transient failure but the tree changed — NOT retrying (partial build goes to review+fix) |
 | 2026-08-24T00:35:00 | 10a | cost:build-session | claude | $1.9016644 |
 | 2026-08-24T00:35:00 | 10a | BLOCKED | — | build session exit=1 |
+| 2026-08-24T21:19:56 | 10c | cost:reality-check | claude | $1.7649809999999997 |
+| 2026-08-24T21:19:56 | 10c | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/10c-reality-check.md |
+| 2026-08-24T21:19:56 | 10c | reality-check | opus | FLAG (blocked; see features/_reality/10c-reality-check.md) |
