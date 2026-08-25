@@ -283,3 +283,10 @@ The validator confirmed feature 10c's architecture is sound and the dependencies
 
 ### 2026-08-24T21:28:51 · 10C · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
 The build step's core premise is broken: the code was supposed to skip database operations when not configured, but it actually keeps finding the database from a config file, so it will try to write to the developer's real database during regular testing. There's also a vague acceptance criterion about secrets that can't be satisfied as written. Both issues need human decision-making before proceeding.
+
+### 2026-08-24T21:34:23 · 10C · 🚀 Starting 10c (postgres-writers-and-migrations.md)
+
+### 2026-08-24T21:34:23 · 10C · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-24T21:38:37 · 10C · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+Reality check verified that most of the database and migration setup matches what was planned, but flagged one blocking issue: the test designed to ensure database credentials don't leak into the code will fail no matter what, because the username is part of your machine's file path, which is already in committed files and test output. A human needs to decide whether to exclude the username from the check or scope it differently so the feature can pass.
