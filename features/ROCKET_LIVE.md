@@ -276,3 +276,10 @@ This build established the foundational infrastructure for Postgres support in t
 
 ### 2026-08-24T21:19:56 · 10C · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
 The validator confirmed feature 10c's architecture is sound and the dependencies mostly exist, but flagged three blockers: the migration runner script can't execute as written (crashes with a missing-module error and lives in a file marked out of scope), the orchestrator test file is named `test_engine.py` not `test_matcher_orchestrator.py`, and the audit log table lacks a TEXT column for the user ID that the brief assumes is available. A human needs to decide how to unblock each before the build proceeds.
+
+### 2026-08-24T21:25:23 · 10C · 🚀 Starting 10c (postgres-writers-and-migrations.md)
+
+### 2026-08-24T21:25:23 · 10C · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-24T21:28:51 · 10C · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The build step's core premise is broken: the code was supposed to skip database operations when not configured, but it actually keeps finding the database from a config file, so it will try to write to the developer's real database during regular testing. There's also a vague acceptance criterion about secrets that can't be satisfied as written. Both issues need human decision-making before proceeding.
