@@ -36,6 +36,7 @@ from typing import Any, Optional
 
 from core.graph.approvals import record_approval_decision
 from core.graph.audit import log_resolution
+from core.graph.dispositions import APPROVAL_STATUS
 from core.graph.entity_store import (
     add_alias,
     add_system_reference,
@@ -197,7 +198,7 @@ def resolve_match(
                     store_conn,
                     source_node,
                     target_node,
-                    "approved",
+                    APPROVAL_STATUS,
                     top.signal_breakdown if top is not None else {},
                     top.graph_evidence if top is not None else {},
                     category_pair,

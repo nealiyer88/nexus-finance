@@ -19,6 +19,17 @@ Feature 10c's approvals writer imports `MAPPING` to translate a resolved
 `pending_decisions.status` into the value it writes to
 `approval_decisions.disposition`.
 
+`APPROVAL_STATUS` is the single terminal value that denotes "this match
+was approved" — the status Stage 6's CONFIRMED path records. It, too, is
+derived rather than transcribed: the graph DDL (`db/schema_sqlite.sql`)
+records the act of approving an edge in `entity_edges` columns named
+`<status>_<suffix>` (the column naming *who* approved the edge), and
+exactly one terminal value from the CHECK appears as such a prefix. Both
+sides of that intersection come from DDL text; no terminal value is
+written into this module, and a change to either DDL that breaks the
+one-to-one correspondence raises at import time rather than silently
+picking a wrong value.
+
 No database is required to import or use this module.
 """
 
@@ -63,3 +74,44 @@ TERMINAL_SET: frozenset[str] = _terminal_set()
 
 # Identity mapping over the terminal set — see module docstring.
 MAPPING: dict[str, str] = {value: value for value in TERMINAL_SET}
+
+
+_GRAPH_DDL = Path(__file__).resolve().parents[2] / "db" / "schema_sqlite.sql"
+
+_EDGES_TABLE_RE = re.compile(
+    r"CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+entity_edges\s*\((?P<body>.*?)\n\s*\);",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _edge_column_name_prefixes() -> frozenset[str]:
+    """Leading `<prefix>_` segment of every `entity_edges` column name."""
+    text = _GRAPH_DDL.read_text()
+    match = _EDGES_TABLE_RE.search(text)
+    if match is None:
+        raise RuntimeError(f"{_GRAPH_DDL.name} does not define an entity_edges table")
+    prefixes = set()
+    for line in match.group("body").splitlines():
+        column = line.strip().split(" ", 1)[0].strip(",")
+        if "_" in column:
+            prefixes.add(column.split("_", 1)[0])
+    return frozenset(prefixes)
+
+
+def _approval_status() -> str:
+    """The terminal status that records an approval — derived, never written.
+
+    See the module docstring: the intersection of the terminal set with
+    the `entity_edges` column-name prefixes must be exactly one value.
+    """
+    candidates = TERMINAL_SET & _edge_column_name_prefixes()
+    if len(candidates) != 1:
+        raise RuntimeError(
+            "cannot derive the approval status: expected exactly one terminal "
+            "value to name an entity_edges column prefix, found "
+            f"{len(candidates)} ({sorted(candidates)})"
+        )
+    return next(iter(candidates))
+
+
+APPROVAL_STATUS: str = _approval_status()

@@ -53,3 +53,6 @@ Reason: reality check FLAG — brief no longer matches the repo; report: feature
 ## 2026-08-24T21:38:37 — 10c BLOCKED
 Reason: reality check FLAG — brief no longer matches the repo; report: features/_reality/10c-reality-check.md
 
+## 2026-08-24T22:23:42 — 10c BLOCKED
+Reason: reviews still FAIL after 3 fix rounds
+

@@ -17,14 +17,16 @@ de-duplication for that synthetic slug is out of scope — a caller wiring a
 real tenant onboarding path should call `resolve_or_create_tenant` directly
 with real values.
 
-A `tenant_id` that is not `None` and not a syntactically valid UUID (the
+A `tenant_id` that is PRESENT but not a syntactically valid UUID (the
 `tenants.id` / `canonical_entities.tenant_id` column type on the Postgres
-side) also falls back to `BOOTSTRAP_TENANT_ID` rather than raising —
-`core.matching.engine`'s `MatchContext.tenant_id` is a free-form app-level
-scoping string on the SQLite side with no format constraint, so a caller
-upstream of this feature may legitimately pass a non-UUID value; this
-writer path degrades to the shared bootstrap tenant instead of failing the
-whole Stage 6 write for a formatting mismatch it doesn't own.
+side) raises `ValueError` — it is never degraded to `BOOTSTRAP_TENANT_ID`.
+Silently bucketing a malformed-but-present tenant identifier into the
+shared bootstrap tenant would file one customer's audit and approval rows
+under another tenant, and an audit trail whose tenant attribution can be
+silently wrong is worse than none at all. Only the absence of a tenant
+(`None`) is a sanctioned fallback. The raised message names the offending
+value and the expected format and carries no connection or credential
+material.
 
 All connections arrive already open, courtesy of `core.graph.pg.connect()`
 — this module never imports the driver to open one, never reads the
@@ -67,15 +69,21 @@ def resolve_or_create_tenant(conn, tenant_id: str, name: str, slug: str) -> str:
 def resolve_tenant_for_write(conn, tenant_id: Optional[str]) -> str:
     """The NULL-tenant fallback shared by every 10c writer.
 
-    `None`, or a value that is not a syntactically valid UUID, maps to the
-    seeded bootstrap tenant id. A valid UUID string is provisioned
-    (idempotently) via `resolve_or_create_tenant`, using the id itself as
-    both `name` and `slug`.
+    `None` — the absence of a tenant — maps to the seeded bootstrap tenant
+    id. A valid UUID string is provisioned (idempotently) via
+    `resolve_or_create_tenant`, using the id itself as both `name` and
+    `slug`. A present-but-malformed tenant identifier raises `ValueError`
+    rather than degrading to the bootstrap tenant: writing one tenant's
+    rows under another's id is a tenant-isolation failure, not a
+    formatting inconvenience.
     """
     if tenant_id is None:
         return BOOTSTRAP_TENANT_ID
     try:
         uuid.UUID(str(tenant_id))
-    except ValueError:
-        return BOOTSTRAP_TENANT_ID
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise ValueError(
+            "tenant_id must be None or a syntactically valid UUID string "
+            f"(the tenants.id column type); got {tenant_id!r}"
+        ) from exc
     return resolve_or_create_tenant(conn, tenant_id, name=str(tenant_id), slug=str(tenant_id))

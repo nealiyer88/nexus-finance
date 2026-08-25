@@ -329,3 +329,21 @@
 | 2026-08-24T21:38:37 | 10c | cost:reality-check | claude | $1.9544970000000006 |
 | 2026-08-24T21:38:37 | 10c | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/10c-reality-check.md |
 | 2026-08-24T21:38:37 | 10c | reality-check | opus | FLAG (blocked; see features/_reality/10c-reality-check.md) |
+| 2026-08-24T21:47:00 | 10c | cost:reality-check | claude | $1.6240055 |
+| 2026-08-24T21:47:00 | 10c | reality-check | opus | GO |
+| 2026-08-24T21:49:19 | 10c | cost:promptgen | claude | $0.7629815 |
+| 2026-08-24T21:49:19 | 10c | prompt-gen | opus | done |
+| 2026-08-24T22:03:27 | 10c | cost:build-session | claude | $3.6346111999999993 |
+| 2026-08-24T22:03:27 | 10c | gates:pre-merge | — | PASS (features/_logs/10c-gates-pre-merge.md) |
+| 2026-08-24T22:06:12 | 10c | cost:review-qa | claude | $0.882692 |
+| 2026-08-24T22:07:54 | 10c | cost:review-code | claude | $0.6227372 |
+| 2026-08-24T22:10:19 | 10c | cost:fix-session | claude | $0.5911892 |
+| 2026-08-24T22:11:26 | 10c | cost:review-qa | claude | $0.5908454 |
+| 2026-08-24T22:13:14 | 10c | cost:review-code | claude | $0.7485024000000001 |
+| 2026-08-24T22:14:35 | 10c | cost:fix-session | claude | $0.3710852 |
+| 2026-08-24T22:17:48 | 10c | cost:review-qa | claude | $0.8522657999999997 |
+| 2026-08-24T22:19:23 | 10c | cost:review-code | claude | $0.6439538000000001 |
+| 2026-08-24T22:20:57 | 10c | cost:fix-session | claude | $0.4601466 |
+| 2026-08-24T22:21:54 | 10c | cost:review-qa | claude | $0.5356510000000001 |
+| 2026-08-24T22:23:42 | 10c | cost:review-code | claude | $0.7074626 |
+| 2026-08-24T22:23:42 | 10c | BLOCKED | — | reviews still FAIL after 3 fix rounds |
