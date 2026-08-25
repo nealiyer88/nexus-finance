@@ -363,6 +363,57 @@ def test_reconcile_reports_informational_only_for_audit_row_with_no_graph_mutati
         pconn.close()
 
 
+def test_main_exits_zero_when_sqlite_row_count_exceeds_audit_row_count(tmp_path) -> None:
+    # Proves the COVERAGE invariant, not count equality: three SQLite
+    # `entity_aliases` rows collapse to a single distinct canonical_id,
+    # and a lone `audit_log` row covers it — SQLite row count (3) exceeds
+    # `audit_log` row count (1) yet the tenant is healthy (exit 0). A
+    # regression to naive `len(sqlite_rows) == len(audit_rows)` equality
+    # would fail this case even though coverage genuinely holds.
+    _require_pg()
+    from scripts.reconcile_stores import main as reconcile_main
+
+    db_path = tmp_path / "graph.sqlite"
+    sconn = sqlite3.connect(str(db_path))
+    sconn.executescript(SQLITE_SCHEMA.read_text())
+    canonical_id = f"CLIENT_HEALTHY_{uuid.uuid4().hex[:8]}"
+    _insert_canonical(sconn, canonical_id)
+    _insert_alias(sconn, canonical_id, "healthy co")
+    _insert_alias(sconn, canonical_id, "healthy co llc")
+    _insert_alias(sconn, canonical_id, "healthy-co")
+    sconn.commit()
+    sconn.close()
+
+    pconn = pg.connect()
+    try:
+        log_resolution(
+            pconn,
+            canonical_id=canonical_id,
+            incoming_entity_raw="Healthy Co",
+            match_type="CONFIRMED",
+            confidence=0.9,
+            signals={},
+            category_pair="psa:accounting",
+            user_id="user_healthy",
+            tenant_id=None,
+        )
+        pconn.commit()
+
+        exit_code = reconcile_main(
+            [
+                "--sqlite-path", str(db_path),
+                "--tenant-id", pg.BOOTSTRAP_TENANT_ID,
+                "--watermark", _SAFE_WATERMARK.isoformat(),
+            ]
+        )
+        assert exit_code == 0
+    finally:
+        with pconn.cursor() as cur:
+            cur.execute("DELETE FROM audit_log WHERE resource_id = %s", (canonical_id,))
+        pconn.commit()
+        pconn.close()
+
+
 def test_main_exits_nonzero_on_uncovered_identifier(tmp_path) -> None:
     _require_pg()
     from scripts.reconcile_stores import main as reconcile_main

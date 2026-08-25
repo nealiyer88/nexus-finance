@@ -313,3 +313,11 @@ The build enables PostgreSQL as a secondary audit and approval store for the mat
 ### 22:08:51 · 10c · 🩹 fixing: [CR-BLOCKING-1] test data pollution in test_audit_pg.py — added commit-then-clean cleanup
 ### 22:10:00 · 10c · ✅ fix verified: 487 passed, no test residue
 ### 22:10:09 · 10c · 📝 fix report written
+
+### 2026-08-24T22:10:19 · 10C · 🔍 qa review running
+
+### 2026-08-24T22:11:26 · 10C · 🔍 code review running
+
+### 2026-08-24T22:13:14 · 10C · 🧪 review round 2 — QA=PASS Code=FAIL
+### 22:13:57 · 10c · 🩹 fixing: [CODE-001] missing coverage-not-equality test for reconcile_stores.py
+### 22:14:22 · 10c · ✅ fix committed: added coverage-not-equality test, 488 passed
