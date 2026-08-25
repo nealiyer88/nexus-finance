@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS connectors (
     category     TEXT NOT NULL,                       -- 'accounting' | 'psa'
     credentials  JSONB NOT NULL DEFAULT '{}',
     last_sync    TIMESTAMPTZ,
+    last_sync_status TEXT,
+    last_sync_error  TEXT,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (tenant_id, provider)
 );

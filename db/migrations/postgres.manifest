@@ -5,3 +5,4 @@
 002_llm_training_data.sql
 003_transactions.sql
 005_tenant_bootstrap.sql
+006_connector_sync_status.sql
