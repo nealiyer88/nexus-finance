@@ -361,3 +361,8 @@
 | 2026-08-24T23:14:53 | 16 | qb-validation | — | SKIPPED (QB gate off / no QB keywords) |
 | 2026-08-24T23:14:53 | 16 | exercise-gate | hook | SKIPPED (no project exercise script) |
 | 2026-08-24T23:14:58 | 16 | gates:post-integration | — | PASS (features/_logs/16-gates-post-integration.md) |
+| 2026-08-24T23:14:59 | 16 | feature-cost | — | $7.5522 / $50 |
+| 2026-08-24T23:14:59 | 16 | SHIPPED | rocket | complete |
+| 2026-08-24T23:17:45 | 11 | cost:reality-check | claude | $1.250841 |
+| 2026-08-24T23:17:45 | 11 | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/11-reality-check.md |
+| 2026-08-24T23:17:45 | 11 | reality-check | opus | FLAG (blocked; see features/_reality/11-reality-check.md) |

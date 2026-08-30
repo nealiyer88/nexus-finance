@@ -59,3 +59,6 @@ Reason: reviews still FAIL after 3 fix rounds
 ## 2026-08-24T22:46:50 — 16 BLOCKED
 Reason: reality check FLAG — brief no longer matches the repo; report: features/_reality/16-reality-check.md
 
+## 2026-08-24T23:17:45 — 11 BLOCKED
+Reason: reality check FLAG — brief no longer matches the repo; report: features/_reality/11-reality-check.md
+

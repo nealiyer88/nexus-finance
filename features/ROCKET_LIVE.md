@@ -369,3 +369,12 @@ Feature 16 builds the Dash dashboard shell and connects it to Postgres via three
 ### 2026-08-24T23:14:53 · 16 · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
 
 ### 2026-08-24T23:14:58 · 16 · 🚦 full gates PASS — clear to ship
+
+### 2026-08-24T23:14:59 · 16 · ✅ SHIPPED — both reviews PASS, queue flipped, committed (~$7.5522 spent).
+
+### 2026-08-24T23:14:59 · 11 · 🚀 Starting 11 (approval-queue.md)
+
+### 2026-08-24T23:14:59 · 11 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-24T23:17:45 · 11 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The approval queue feature remains unbuilt, but five key dependencies have shifted since the brief was written: the tenant middleware, database engine choices, and dashboard shell are already shipped with different assumptions than the brief requires, creating conflicts over whether the approvals router should provide its own tenant resolution or inherit the default fallback, and whether it should access SQLite directly (as written) or use the Postgres engine the API layer was designed around. A human decision is needed on these architectural mismatches before building can proceed.
