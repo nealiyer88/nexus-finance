@@ -31,13 +31,16 @@ this one.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
+import os
 import sqlite3
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any, Iterator, Optional
 
 from core.graph.entity_store import _assert_tenant_scope
 from core.ingestion.normalizer import NormalizedEntity
@@ -77,6 +80,33 @@ _COLUMNS: tuple[str, ...] = (
     "outcome_canonical_id",
 )
 _SELECT_COLUMNS_SQL: str = ", ".join(_COLUMNS)
+
+# Feature 11 addition: the store's SQLite file path. `nexus.db` at the
+# repository root is the V1 default (already `.gitignore`d via `*.db`);
+# `NEXUS_STORE_PATH` overrides it, read via `os.environ.get` in the same
+# precedence style as `api.middleware.tenant`'s `NEXUS_TENANT_ID`. No
+# second variable, no settings object, no CLI argument.
+DEFAULT_STORE_PATH: str = str(Path(__file__).resolve().parents[2] / "nexus.db")
+
+
+@contextlib.contextmanager
+def get_connection() -> Iterator[sqlite3.Connection]:
+    """Module-level connection provider for this store.
+
+    Resolves the SQLite file path at call time (never at import time)
+    from `NEXUS_STORE_PATH`, falling back to `DEFAULT_STORE_PATH`. Opens
+    the connection, yields it, and closes it on exit — including on the
+    exception path. This is the only way callers (the approvals API
+    router, the approval-queue dashboard page) obtain a connection to
+    this store; neither caller constructs a `sqlite3.Connection` of its
+    own.
+    """
+    path = os.environ.get("NEXUS_STORE_PATH", DEFAULT_STORE_PATH)
+    conn = sqlite3.connect(path)
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 @dataclass(frozen=True)

@@ -3,12 +3,13 @@ from fastapi import FastAPI
 
 from api.middleware.audit import AuditMiddleware
 from api.middleware.tenant import DEFAULT_TENANT_ID, TenantMiddleware
-from api.routers import connectors
+from api.routers import approvals, connectors
 from core.graph import pg
 
 app = FastAPI(title="Nexus Finance", version="0.1.0")
 
 app.include_router(connectors.router)
+app.include_router(approvals.router)
 
 # Tenant middleware added last so it is outermost — it validates/resolves
 # the tenant identity, including rejecting malformed headers with a 400,
