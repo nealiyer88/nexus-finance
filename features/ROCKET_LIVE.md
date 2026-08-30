@@ -392,3 +392,10 @@ The approval queue feature (11) has three critical blockers flagged before build
 
 ### 2026-08-29T21:18:06 · 11 · 🧪 review round 1 — QA=FAIL Code=FAIL
 ### 21:34:36 · 11 · 🩹 fixing: QA-001/QA-002/CR-001/CR-002 — no build had landed; implemented full brief and committed
+
+### 2026-08-29T21:34:43 · 11 · 🔍 qa review running
+
+### 2026-08-29T21:35:58 · 11 · 🔍 code review running
+
+### 2026-08-29T21:37:04 · 11 · 🧪 review round 2 — QA=FAIL Code=PASS
+### 21:38:13 · 11 · 🩹 fixing: QA-001 (self-referential HEAD comparison)

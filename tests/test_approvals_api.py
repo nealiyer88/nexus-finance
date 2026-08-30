@@ -264,8 +264,41 @@ def test_router_reachable_from_app():
     assert router_pairs <= app_pairs
 
 
+def _load_pre_registration_main_module() -> types.ModuleType:
+    """Exec the last `api/main.py` revision in git history that predates
+    the `approvals.router` registration, so 'before' is derived from git
+    history rather than transcribed into this test. Walking history (instead
+    of assuming `HEAD`) keeps this correct even once the registration itself
+    is committed at `HEAD`."""
+    log = subprocess.run(
+        ["git", "log", "--format=%H", "--follow", "--", "api/main.py"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    for sha in log:
+        content = subprocess.run(
+            ["git", "show", f"{sha}:api/main.py"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        if "approvals.router" not in content:
+            module = types.ModuleType("_pre_registration_api_main_test11")
+            module.__file__ = str(REPO_ROOT / "api/main.py")
+            sys.modules[module.__name__] = module
+            try:
+                exec(compile(content, module.__file__, "exec"), module.__dict__)
+            finally:
+                sys.modules.pop(module.__name__, None)
+            return module
+    raise AssertionError("no revision of api/main.py predates approvals.router registration")
+
+
 def test_registration_is_additive_and_middleware_unchanged():
-    head_main = _load_head_module("api/main.py", "_head_api_main_test11")
+    head_main = _load_pre_registration_main_module()
     before_pairs = _route_pairs(head_main.app.routes)
     assert before_pairs
     after_pairs = _route_pairs(app.routes)
