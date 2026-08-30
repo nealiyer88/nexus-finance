@@ -69,3 +69,9 @@ Brief: features/data/historical-cold-start.md
 Tests: 621 passed
 Reviews: QA PASS (blind), Code PASS
 Gates: QB=NOT RUN, Exercise=SKIPPED
+
+## 2026-08-29 — 15 (shipped by rocket)
+Brief: features/dashboard/ar-reconciliation.md
+Tests: 639 passed
+Reviews: QA PASS (blind), Code PASS
+Gates: QB=NOT RUN, Exercise=SKIPPED

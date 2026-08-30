@@ -431,3 +431,16 @@
 | 2026-08-29T23:00:39 | 13 | qb-validation | — | SKIPPED (QB gate off / no QB keywords) |
 | 2026-08-29T23:00:39 | 13 | exercise-gate | hook | SKIPPED (no project exercise script) |
 | 2026-08-29T23:00:47 | 13 | gates:post-integration | — | PASS (features/_logs/13-gates-post-integration.md) |
+| 2026-08-29T23:00:47 | 13 | feature-cost | — | $3.1813 / $50 |
+| 2026-08-29T23:00:47 | 13 | SHIPPED | rocket | complete |
+| 2026-08-29T23:03:23 | 15 | cost:reality-check | claude | $1.5993279999999999 |
+| 2026-08-29T23:03:23 | 15 | reality-check | opus | GO |
+| 2026-08-29T23:04:23 | 15 | cost:promptgen | claude | $0.42741900000000005 |
+| 2026-08-29T23:04:23 | 15 | prompt-gen | opus | done |
+| 2026-08-29T23:28:14 | 15 | cost:build-session | claude | $1.3167817999999996 |
+| 2026-08-29T23:28:14 | 15 | gates:pre-merge | — | PASS (features/_logs/15-gates-pre-merge.md) |
+| 2026-08-29T23:29:21 | 15 | cost:review-qa | claude | $0.395113 |
+| 2026-08-29T23:30:08 | 15 | cost:review-code | claude | $0.3381638 |
+| 2026-08-29T23:30:08 | 15 | qb-validation | — | SKIPPED (QB gate off / no QB keywords) |
+| 2026-08-29T23:30:08 | 15 | exercise-gate | hook | SKIPPED (no project exercise script) |
+| 2026-08-29T23:30:15 | 15 | gates:post-integration | — | PASS (features/_logs/15-gates-post-integration.md) |

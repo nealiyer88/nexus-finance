@@ -518,3 +518,30 @@ The build will create cold-start seeding and cross-category clustering modules t
 ### 2026-08-29T23:00:39 · 13 · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
 
 ### 2026-08-29T23:00:47 · 13 · 🚦 full gates PASS — clear to ship
+
+### 2026-08-29T23:00:47 · 13 · ✅ SHIPPED — both reviews PASS, queue flipped, committed (~$3.1813 spent).
+
+### 2026-08-29T23:00:48 · 15 · 🚀 Starting 15 (ar-reconciliation.md)
+
+### 2026-08-29T23:00:48 · 15 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-29T23:03:23 · 15 · ✅ reality check GO — brief matches the current repo
+
+### 2026-08-29T23:04:23 · 15 · 📝 Wrote the build prompt
+This build step creates an accounts receivable reconciliation system that compares labor costs tracked in the PSA system against invoiced amounts in QuickBooks, calculates the dollar variance for each client, and flags which are properly billed, under-billed, or over-billed. It adds a dashboard page showing a summary table with status indicators and an API endpoint for detailed transaction breakdowns. The system respects tenant boundaries so each customer only sees their own reconciliation data.
+
+### 2026-08-29T23:04:32 · 15 · 🔨 Builder starting — code + tests + commit
+### 23:27:18 · 15 · 🔨 building
+### 23:27:33 · 15 · 🧪 tests green (639 passed)
+
+### 2026-08-29T23:28:14 · 15 · 🧹 fast gates PASS
+
+### 2026-08-29T23:28:14 · 15 · 🔍 qa review running
+
+### 2026-08-29T23:29:21 · 15 · 🔍 code review running
+
+### 2026-08-29T23:30:08 · 15 · 🧪 review round 1 — QA=PASS Code=PASS
+
+### 2026-08-29T23:30:08 · 15 · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
+
+### 2026-08-29T23:30:15 · 15 · 🚦 full gates PASS — clear to ship
