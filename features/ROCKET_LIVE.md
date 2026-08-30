@@ -457,3 +457,12 @@ Error: Exceeded USD budget (0.25)
 ### 2026-08-29T22:20:24 · 14 · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
 
 ### 2026-08-29T22:20:31 · 14 · 🚦 full gates PASS — clear to ship
+
+### 2026-08-29T22:20:31 · 14 · ✅ SHIPPED — both reviews PASS, queue flipped, committed (~$4.345 spent).
+
+### 2026-08-29T22:20:31 · 15 · 🚀 Starting 15 (ar-reconciliation.md)
+
+### 2026-08-29T22:20:31 · 15 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-29T22:22:48 · 15 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The reality check found that the feature brief contains outdated information—several things it assumes don't exist are actually already shipped in the codebase, and the brief's description of the current API structure is incorrect. Five mismatches need quick clarification (mainly about tenant handling and database access patterns) and one genuine open decision still needs to be made before the builder can start. These issues won't block development but need resolving so the builder doesn't restructure things that already exist or write code inconsistent with the rest of the system.

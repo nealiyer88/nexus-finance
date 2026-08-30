@@ -71,14 +71,23 @@ them and must not reimplement the matching or ingestion pipeline inside the new 
     `normalize_entity()` call in this feature.
   - Drives the feature 12 orchestrator over the normalized set, then groups the resulting
     dispositions into cross-category clusters for guided review.
-  - Cold start surfaces more for human review than steady state. See the open threshold
-    question below — the mechanism for "relaxed" is a decision, not an implementation detail.
+  - Cold start runs on the shipped steady-state thresholds. No relaxed or widened band is in
+    scope — see Open Decisions.
 
 - Create `core/ingestion/clustering.py`:
   - `cluster_entities(...)` — takes the scored/dispositioned output of the seeding run and
     groups it into candidate clusters ranked by aggregate confidence. The concrete input
     element is `core/matching/types.ScoredMatch` (or the `Disposition` that wraps a ranked
     tuple of them); do not invent a new pair type.
+  - **Null-tolerant input contract.** The matcher returns a `MatchResult` whose `disposition`
+    and `signal_breakdown` are both absent on the Stage 1 deterministic short-circuit and on
+    the no-candidates path, and on an empty graph the entire first connector run takes the
+    no-candidates path. The clustering step MUST accept a missing disposition and a missing
+    signal breakdown without raising.
+  - **Cluster semantics for entities with no pair — DECIDED.** Clusters derive only from a
+    disposition's ranked candidates. An entity whose disposition is absent (Stage 1 hit, or
+    no candidates) belongs to ZERO clusters; that is expected output, not an error. Only
+    members whose disposition action is queue-for-review get an enqueued pending row.
   - Each cluster: proposed canonical name, aliases per source category (`accounting` |
     `psa`, per `NormalizedEntity.category`), aggregate confidence, recommended action.
   - Cluster size is data-dependent, not fixed. The guided-onboarding session length is a
@@ -105,9 +114,13 @@ them and must not reimplement the matching or ingestion pipeline inside the new 
 - **Test suite:** `tests/test_historical.py`
   - Seed an empty graph with the fixture set (`tests/fixtures/qb_entities.json`,
     `tests/fixtures/ruddr_entities.json`) via the historical pipeline. Derive the fixture
-    entity count at test time by loading the fixtures — never write it into the test.
+    entity count at test time by loading the fixtures — never write it into the test. Assert
+    this at feature 13's own module level (through `seed_from_history`) rather than relying on
+    the existing `tests/test_pipeline.py` coverage of the same property.
   - Assert: cluster count is > 0 and ≤ the number of seeded entities, and every seeded
-    entity appears in at most one cluster.
+    entity appears in at most one cluster. The `> 0` lower bound is the non-emptiness
+    precondition — it must hold on the fixture set even though pairless entities are excluded
+    from clustering, so the "at most one cluster" check can never pass vacuously.
   - Assert: every pair whose score ≥ `disposition.AUTO_APPROVE_THRESHOLD` lands in the same
     cluster as its counterpart (import the constant; do not restate its value).
   - Assert: LLM-assisted clustering is invoked for pairs in the fallback band, using an
@@ -130,12 +143,12 @@ them and must not reimplement the matching or ingestion pipeline inside the new 
 
 ## Open Decisions (require a human, not a rewrite)
 
-1. **Relaxed cold-start band.** The shipped Stage 4 has one band set, module-level and not
-   parameterized: below `LLM_FALLBACK_THRESHOLD` there is no `top_match` at all. Widening
-   the cold-start LLM band below it requires either (a) parameterizing `apply_thresholds`,
-   (b) cold start calling `score_candidate_set` and doing its own banding, bypassing Stage 4
-   — which forfeits cluster-conflict detection and abbreviation rescue, or (c) dropping the
-   wider band and using the steady-state one. Pick one before build.
+1. **Cold-start confidence band — DECIDED: steady-state thresholds, unchanged.** The shipped
+   Stage 4 has one band set, module-level and not parameterized: `apply_thresholds` takes no
+   band arguments, and below `LLM_FALLBACK_THRESHOLD` there is no `top_match` at all. Any
+   wider band would require code changes in `core/matching/disposition.py`, which this brief
+   puts Out of Scope. Cold start therefore runs on the steady-state thresholds. Re-banding for
+   cold start is out of scope here and needs its own feature.
 2. **LLM call cap — DECIDED: degrade, do not fail.** The shipped orchestrator already catches
    the budget-exceeded failure inside `match()` and rewrites the disposition to
    queue-for-review, and the ingestion run resets the call budget once per run. A cold start
@@ -144,7 +157,10 @@ them and must not reimplement the matching or ingestion pipeline inside the new 
    and no new budget mechanism is built.
 3. **Where a pending cluster is stored — DECIDED: no cluster-level storage.** A cluster is an
    in-memory return value from `cluster_entities()` plus one enqueued pending row per member
-   entity, written through the shipped pending-decision store. **No cluster-level table and no
+   entity **whose disposition action is queue-for-review**, written through the shipped
+   pending-decision store. The store's enqueue is a no-op unless the action is queue-for-review
+   and a top match exists, so members without a top match cannot be enqueued at all and are
+   cluster-only. **No cluster-level table and no
    schema change is in scope.** `approval_decisions` remains Postgres-only and is neither
    created nor queried at runtime.
 
@@ -155,8 +171,11 @@ them and must not reimplement the matching or ingestion pipeline inside the new 
 - [ ] `core/ingestion/historical.py` exists with `seed_from_history()`
 - [ ] `core/ingestion/clustering.py` exists with `cluster_entities()`
 - [ ] Historical seeding processes every entity loaded from the fixture files (count derived
-      at test time) with no unhandled exceptions
-- [ ] Cluster count > 0, ≤ seeded entity count; no entity appears in two clusters
+      at test time) with no unhandled exceptions — asserted at feature 13's own module level
+      through `seed_from_history`, not inherited from the existing pipeline tests
+- [ ] Cluster count > 0, ≤ seeded entity count; no entity appears in two clusters. The `> 0`
+      lower bound is a required non-emptiness precondition, and entities with no pair
+      legitimately appear in zero clusters
 - [ ] Each cluster carries: proposed canonical name, aliases per source category, aggregate
       confidence, recommended action
 - [ ] LLM-assisted clustering goes through `llm_assess` / `redaction.py`; no second
@@ -164,7 +183,9 @@ them and must not reimplement the matching or ingestion pipeline inside the new 
 - [ ] No LLM-derived cluster carries an auto-approve recommendation
 - [ ] Second pass after simulated approval of the seeded clusters produces strictly more
       auto-approvals than the first pass on the empty graph (monotonic improvement, measured
-      in-test against the first pass — not against a fixed percentage)
+      in-test against the first pass — not against a fixed percentage), asserted at feature
+      13's own module level through `seed_from_history`, not inherited from the existing
+      pipeline tests
 - [ ] `.venv/bin/python -m pytest tests/test_historical.py -x --tb=short` passes AND reports
       a collected test count greater than zero (a bare exit code is not acceptable evidence)
 
@@ -185,9 +206,9 @@ them and must not reimplement the matching or ingestion pipeline inside the new 
 **Rating:** M
 
 **Rationale:** Clustering logic is the new work — the rest reuses the shipped pipeline. The
-real cost is not the clustering algorithm; it is the one unresolved seam above (band
-widening), which touches a shipped module this feature is not supposed to modify. Resolve
-that before estimating build time.
+band-widening seam is resolved above (steady-state thresholds, no change to the shipped
+module), so the remaining cost is the clustering algorithm plus its null-tolerant handling of
+entities that arrive with no disposition.
 
 ---
 
