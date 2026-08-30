@@ -545,3 +545,14 @@ This build step creates an accounts receivable reconciliation system that compar
 ### 2026-08-29T23:30:08 · 15 · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
 
 ### 2026-08-29T23:30:15 · 15 · 🚦 full gates PASS — clear to ship
+
+### 2026-08-29T23:30:15 · 15 · ✅ SHIPPED — both reviews PASS, queue flipped, committed (~$4.0768 spent).
+
+### 2026-08-29T23:30:16 · 17 · 🚀 Starting 17 (signup-onboarding.md)
+
+### 2026-08-29T23:30:16 · 17 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-29T23:31:04 · 17 · ⚠️ reality check produced no verdict (exit 143) — recorded FLAG (fails closed)
+
+### 2026-08-29T23:31:04 · 17 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The automated safety check crashed before it could complete its analysis. Since the check never finished, the system treated it as a failure and blocked the build step. The build is flagged and won't proceed until this check can run successfully.
