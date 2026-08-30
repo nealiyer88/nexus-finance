@@ -36,7 +36,7 @@
 | 11 | approval-queue | features/dashboard/approval-queue.md | 9, 10, 10b, 16 | SHIPPED | v4 |
 | 12 | matcher-orchestrator | features/pipeline/matcher-orchestrator.md | 7, 8, 8a, 8b, 9, 10, 10b | SHIPPED | v4 §7 |
 | 13 | historical-cold-start | features/data/historical-cold-start.md | 11, 12 | BLOCKED | v4 |
-| 14 | overview-entity-browser | features/dashboard/overview-entity-browser.md | 10, 11, 16 | QUEUED | v4 |
+| 14 | overview-entity-browser | features/dashboard/overview-entity-browser.md | 10, 11, 16 | BLOCKED | v4 |
 | 15 | ar-reconciliation | features/dashboard/ar-reconciliation.md | 12, 14 | QUEUED | v4 |
 | 16 | connectors-audit-infra | features/infrastructure/connectors-audit-infra.md | 5, 6, 10a, 10c | SHIPPED | v4 |
 | 17 | signup-onboarding | features/infrastructure/signup-onboarding.md | 1, 2, 3, 4, 5, 6, 7, 8, 8a, 8b, 9, 10, 10a, 10b, 10c, 11, 12, 13, 14, 15, 16 | QUEUED | v4 |
