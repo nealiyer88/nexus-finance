@@ -21,6 +21,11 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
+from core.graph.entity_store import AMOUNT_TOLERANCE_CAP, AMOUNT_TOLERANCE_PCT  # noqa: E402
+
 FIXTURES_DIR = Path(__file__).parent
 
 KNOWN_DEPARTMENTS = {
@@ -138,6 +143,82 @@ def validate_fixtures():
         actual = last_name_counts.get(surname, 0)
         if actual < expected_count:
             warnings.append(f"Shared last name '{surname}': expected >={expected_count}, found {actual}")
+
+    # --- Transaction fixture referential integrity (feature 12a) ---
+    qb_txns = load_json("qb_transactions.json")
+    ruddr_txns = load_json("ruddr_time_entries.json")
+
+    qb_txn_refs = {
+        t.get("customer_ref") or t.get("vendor_ref")
+        for t in qb_txns
+        if t.get("customer_ref") or t.get("vendor_ref")
+    }
+    if not qb_txn_refs:
+        errors.append("qb_transactions.json: no counterparty references found")
+    for ref in qb_txn_refs:
+        if ref not in qb_ids:
+            errors.append(f"qb_transactions.json: counterparty ref {ref} not found in qb_entities.json")
+
+    ruddr_txn_client_refs = {
+        t.get("client_id") for t in ruddr_txns if t.get("client_id")
+    }
+    if not ruddr_txn_client_refs:
+        errors.append("ruddr_time_entries.json: no client_id references found")
+    for ref in ruddr_txn_client_refs:
+        if ref not in ruddr_ids:
+            errors.append(f"ruddr_time_entries.json: client_id {ref} not found in ruddr_entities.json")
+
+    ruddr_txn_resource_refs = {
+        t.get("resource_id") for t in ruddr_txns if t.get("resource_id")
+    }
+    if not ruddr_txn_resource_refs:
+        errors.append("ruddr_time_entries.json: no resource_id references found")
+    for ref in ruddr_txn_resource_refs:
+        if ref not in ruddr_ids:
+            errors.append(f"ruddr_time_entries.json: resource_id {ref} not found in ruddr_entities.json")
+
+    # --- At least one ground-truth pair co-occurs within tolerance (B3) ---
+    qb_txns_by_customer: dict = {}
+    for t in qb_txns:
+        ref = t.get("customer_ref")
+        if ref:
+            qb_txns_by_customer.setdefault(ref, []).append(t)
+    ruddr_txns_by_client: dict = {}
+    for t in ruddr_txns:
+        ref = t.get("client_id")
+        if ref:
+            ruddr_txns_by_client.setdefault(ref, []).append(t)
+
+    found_cooccurrence = False
+    for canon in truth["canonical_entities"]:
+        qb_ref = canon["sources"].get("quickbooks", {}).get("id")
+        ruddr_ref = canon["sources"].get("ruddr", {}).get("id")
+        if not qb_ref or not ruddr_ref:
+            continue
+        for qb_t in qb_txns_by_customer.get(qb_ref, []):
+            qb_period = str(qb_t.get("txn_date", ""))[:7]
+            qb_amount = float(qb_t.get("total_amt", 0.0))
+            qb_currency = qb_t.get("currency", "USD")
+            for r_t in ruddr_txns_by_client.get(ruddr_ref, []):
+                r_period = str(r_t.get("date", ""))[:7]
+                r_currency = r_t.get("currency", "USD")
+                r_amount = float(r_t.get("hours", 0.0)) * float(r_t.get("billing_rate", 0.0))
+                if qb_period != r_period or qb_currency != r_currency:
+                    continue
+                tolerance = min(max(abs(qb_amount), abs(r_amount)) * AMOUNT_TOLERANCE_PCT, AMOUNT_TOLERANCE_CAP)
+                if abs(abs(qb_amount) - abs(r_amount)) <= tolerance:
+                    found_cooccurrence = True
+                    break
+            if found_cooccurrence:
+                break
+        if found_cooccurrence:
+            break
+
+    if not found_cooccurrence:
+        errors.append(
+            "no ground-truth entity has a same-period, same-currency, "
+            "within-tolerance amount on both the QB and RUDDR transaction sides"
+        )
 
     return errors, warnings
 

@@ -160,6 +160,7 @@ class QuickBooksConnector(ConnectorInterface):
         http_client: Optional[HTTPClient] = None,
         rate_limiter: Optional[RateLimiter] = None,
         fixture_path: Optional[str] = None,
+        transaction_fixture_path: Optional[str] = None,
         base_url: str = "https://quickbooks.api.intuit.com/v3",
     ) -> None:
         self.tenant_id = tenant_id
@@ -171,6 +172,7 @@ class QuickBooksConnector(ConnectorInterface):
         self.http_client = http_client
         self.rate_limiter = rate_limiter or RateLimiter(500, 60.0)
         self.fixture_path = fixture_path
+        self.transaction_fixture_path = transaction_fixture_path
         self.base_url = base_url
 
     # -----------------------------------------------------------------
@@ -403,6 +405,9 @@ class QuickBooksConnector(ConnectorInterface):
     def _fetch_raw_transactions(
         self, date_range: DateRange
     ) -> List[Dict[str, Any]]:
+        if self.transaction_fixture_path is not None:
+            records = self._load_transaction_fixture()
+            return [r for r in records if self._txn_in_range(r, date_range)]
         if self.fixture_path is not None:
             return []
         if self.http_client is None:
@@ -444,6 +449,27 @@ class QuickBooksConnector(ConnectorInterface):
         if not isinstance(data, list):
             raise ConnectorError("Fixture must be a JSON list of records.")
         return data
+
+    def _load_transaction_fixture(self) -> List[Dict[str, Any]]:
+        path = (
+            Path(self.transaction_fixture_path)
+            if self.transaction_fixture_path
+            else None
+        )
+        if path is None or not path.exists():
+            raise ConnectorError(
+                f"Transaction fixture not found: {self.transaction_fixture_path!r}"
+            )
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            raise ConnectorError("Transaction fixture must be a JSON list of records.")
+        return data
+
+    @staticmethod
+    def _txn_in_range(raw: Dict[str, Any], date_range: DateRange) -> bool:
+        txn_date = raw.get("TxnDate") or raw.get("txn_date") or ""
+        return date_range.start <= txn_date <= date_range.end
 
     @staticmethod
     def _matches_filters(raw: Dict[str, Any], filters: Dict[str, Any]) -> bool:

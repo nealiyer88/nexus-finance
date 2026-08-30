@@ -1,0 +1,50 @@
+[
+  {
+    "id": "QB-TXN-001",
+    "type": "Invoice",
+    "total_amt": 1000.00,
+    "currency": "USD",
+    "txn_date": "2026-03-15",
+    "customer_ref": "QB-001"
+  },
+  {
+    "id": "QB-TXN-002",
+    "type": "Payment",
+    "total_amt": 500.00,
+    "currency": "USD",
+    "txn_date": "2026-03-10",
+    "customer_ref": "QB-002"
+  },
+  {
+    "id": "QB-TXN-003",
+    "type": "Bill",
+    "total_amt": 750.00,
+    "currency": "USD",
+    "txn_date": "2026-04-01",
+    "vendor_ref": "QB-008"
+  },
+  {
+    "id": "QB-TXN-004",
+    "type": "Invoice",
+    "total_amt": 2200.00,
+    "currency": "USD",
+    "txn_date": "2026-02-20",
+    "customer_ref": "QB-003"
+  },
+  {
+    "id": "QB-TXN-005",
+    "type": "Payment",
+    "total_amt": 300.00,
+    "currency": "USD",
+    "txn_date": "2026-01-05",
+    "customer_ref": "QB-001"
+  },
+  {
+    "id": "QB-TXN-006",
+    "type": "Bill",
+    "total_amt": 125.50,
+    "currency": "USD",
+    "txn_date": "2026-03-22",
+    "vendor_ref": "QB-017"
+  }
+]

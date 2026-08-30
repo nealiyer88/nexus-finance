@@ -1,0 +1,42 @@
+[
+  {
+    "id": "RUDDR-TXN-001",
+    "hours": 10.0,
+    "billing_rate": 100.00,
+    "currency": "USD",
+    "date": "2026-03-15",
+    "resource_id": "RUDDR-020",
+    "client_id": "RUDDR-001",
+    "project_code": "CEN-GP-SOW1"
+  },
+  {
+    "id": "RUDDR-TXN-002",
+    "hours": 5.0,
+    "billing_rate": 150.00,
+    "currency": "USD",
+    "date": "2026-03-10",
+    "resource_id": "RUDDR-021",
+    "client_id": "RUDDR-002",
+    "project_code": "DBS-DATA-SOW1"
+  },
+  {
+    "id": "RUDDR-TXN-003",
+    "hours": 8.0,
+    "billing_rate": 90.00,
+    "currency": "USD",
+    "date": "2026-02-05",
+    "resource_id": "RUDDR-020",
+    "client_id": "RUDDR-003",
+    "project_code": "IRO-SEC-SOW1"
+  },
+  {
+    "id": "RUDDR-TXN-004",
+    "hours": 3.0,
+    "billing_rate": 80.00,
+    "currency": "USD",
+    "date": "2026-01-20",
+    "resource_id": "RUDDR-022",
+    "client_id": "RUDDR-001",
+    "project_code": "CEN-GP-SOW1"
+  }
+]
