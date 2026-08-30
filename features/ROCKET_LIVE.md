@@ -399,3 +399,13 @@ The approval queue feature (11) has three critical blockers flagged before build
 
 ### 2026-08-29T21:37:04 · 11 · 🧪 review round 2 — QA=FAIL Code=PASS
 ### 21:38:13 · 11 · 🩹 fixing: QA-001 (self-referential HEAD comparison)
+
+### 2026-08-29T21:38:39 · 11 · 🔍 qa review running
+
+### 2026-08-29T21:40:21 · 11 · 🔍 code review running
+
+### 2026-08-29T21:41:39 · 11 · 🧪 review round 3 — QA=PASS Code=PASS
+
+### 2026-08-29T21:41:39 · 11 · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
+
+### 2026-08-29T21:41:46 · 11 · 🚦 full gates PASS — clear to ship

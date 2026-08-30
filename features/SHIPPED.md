@@ -45,3 +45,9 @@ Brief: features/infrastructure/connectors-audit-infra.md
 Tests: 543 passed
 Reviews: QA PASS (blind), Code PASS
 Gates: QB=NOT RUN, Exercise=SKIPPED
+
+## 2026-08-29 — 11 (shipped by rocket)
+Brief: features/dashboard/approval-queue.md
+Tests: 577 passed
+Reviews: QA PASS (blind), Code PASS
+Gates: QB=NOT RUN, Exercise=SKIPPED
