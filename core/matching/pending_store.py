@@ -88,6 +88,101 @@ _SELECT_COLUMNS_SQL: str = ", ".join(_COLUMNS)
 # second variable, no settings object, no CLI argument.
 DEFAULT_STORE_PATH: str = str(Path(__file__).resolve().parents[2] / "nexus.db")
 
+# Schema bootstrap. `sqlite3.connect` silently creates an empty file for a
+# path that does not exist, and nothing else in the tree ever applies the
+# SQLite DDL to it — so a first-run store answered every query with
+# `no such table: pending_decisions`. `_ensure_schema` closes that gap by
+# applying the SAME SQL files the tests and the migration story already
+# use: the base graph schema plus every SQLite-dialect migration, located
+# by listing `db/migrations/` at call time (the `*_sqlite.sql` selection
+# rule `core/graph/dispositions.py` already relies on) rather than by
+# hardcoded filename. No DDL is transcribed into Python here. There is no
+# reusable SQLite migration runner in the tree to defer to: the only
+# runner, `scripts/migrate_pg.py`, targets the other engine and is driven
+# by a manifest that deliberately excludes every `*_sqlite.sql` file.
+_REPO_ROOT: Path = Path(__file__).resolve().parents[2]
+_BASE_SCHEMA_PATH: Path = _REPO_ROOT / "db" / "schema_sqlite.sql"
+_MIGRATIONS_DIR: Path = _REPO_ROOT / "db" / "migrations"
+
+# The table this module owns; its presence is the bootstrap's "already
+# provisioned" probe.
+_STORE_TABLE: str = "pending_decisions"
+
+_TABLE_EXISTS_SQL: str = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?"
+
+
+def _sqlite_ddl_paths() -> list[Path]:
+    """The ordered SQL files that define this store's SQLite schema.
+
+    The base graph schema first, then every SQLite-dialect migration in
+    filename order. Listed from disk at call time — a new
+    `*_sqlite.sql` migration is picked up with no edit here.
+    """
+    return [_BASE_SCHEMA_PATH, *sorted(_MIGRATIONS_DIR.glob("*_sqlite.sql"))]
+
+
+def _is_shared_file_path(path: str) -> bool:
+    """True when `path` names a database a second connection can reach.
+
+    `:memory:` (and the URI spellings of it) give every connection its
+    own private database, so provisioning one from a separate connection
+    would leave the caller's connection empty.
+    """
+    if path in ("", ":memory:"):
+        return False
+    return "mode=memory" not in path
+
+
+def _ensure_schema(conn: sqlite3.Connection, path: str) -> None:
+    """Provision the store's schema if, and only if, it has none.
+
+    Idempotent and cheap on the common case: a single `sqlite_master`
+    lookup on the connection already in hand, and nothing else, once the
+    schema exists. Correct under repeated calls both because of that
+    probe and because every statement in the DDL files is itself
+    `CREATE ... IF NOT EXISTS`.
+
+    The DDL is applied over a connection in SQLite's autocommit mode, so
+    each statement persists as it runs. That is what lets this module
+    keep 10b's contract intact: no `commit`/`rollback` is issued anywhere
+    in it, and for a real file the caller's own connection — whose
+    transaction boundary belongs to the caller — is not the one the DDL
+    runs on.
+
+    Deliberately narrow: only the missing-schema case is provisioned. No
+    exception is caught here, so a corrupt or unreadable database file, a
+    permissions failure, or a malformed DDL file propagates to the caller
+    instead of being mistaken for "needs provisioning".
+    """
+    if conn.execute(_TABLE_EXISTS_SQL, (_STORE_TABLE,)).fetchone() is not None:
+        return
+
+    if _is_shared_file_path(path):
+        target = sqlite3.connect(path, isolation_level=None)
+        restore_isolation_level = None
+    else:
+        # A private in-memory database: it must be provisioned on the very
+        # connection the caller will use. Nothing is pending on it — it was
+        # opened moments ago — so switching it into autocommit for the DDL
+        # discards no caller work.
+        target = conn
+        restore_isolation_level = conn.isolation_level
+        conn.isolation_level = None
+
+    try:
+        for ddl_path in _sqlite_ddl_paths():
+            target.executescript(ddl_path.read_text())
+        if target.execute(_TABLE_EXISTS_SQL, (_STORE_TABLE,)).fetchone() is None:
+            raise RuntimeError(
+                f"schema bootstrap applied {[p.name for p in _sqlite_ddl_paths()]} "
+                f"but no {_STORE_TABLE} table exists"
+            )
+    finally:
+        if target is conn:
+            conn.isolation_level = restore_isolation_level
+        else:
+            target.close()
+
 
 @contextlib.contextmanager
 def get_connection() -> Iterator[sqlite3.Connection]:
@@ -95,15 +190,17 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 
     Resolves the SQLite file path at call time (never at import time)
     from `NEXUS_STORE_PATH`, falling back to `DEFAULT_STORE_PATH`. Opens
-    the connection, yields it, and closes it on exit — including on the
-    exception path. This is the only way callers (the approvals API
-    router, the approval-queue dashboard page) obtain a connection to
-    this store; neither caller constructs a `sqlite3.Connection` of its
-    own.
+    the connection, bootstraps the schema if the file is new or empty
+    (see `_ensure_schema`), yields it, and closes it on exit — including
+    on the exception path. This is the only way callers (the approvals
+    API router, the approval-queue dashboard page) obtain a connection
+    to this store; neither caller constructs a `sqlite3.Connection` of
+    its own.
     """
     path = os.environ.get("NEXUS_STORE_PATH", DEFAULT_STORE_PATH)
     conn = sqlite3.connect(path)
     try:
+        _ensure_schema(conn, path)
         yield conn
     finally:
         conn.close()

@@ -14,34 +14,32 @@ On Day 1, the graph is empty. Without historical seeding, the first sync cycle p
 
 ---
 
-## Forward Dependencies (contracts, not implementations)
+## Upstream contracts (SHIPPED)
 
-These do **not** exist in the tree today. This brief consumes them by contract only; do not
-guess at their internals, and do not treat any of them as present when writing code.
+Features 11 and 12 are shipped and present in the tree. Feature 13 builds **on top of**
+them and must not reimplement the matching or ingestion pipeline inside the new modules.
 
 **From feature 12 (matcher orchestrator):**
-- `core/matching/engine.py` — a single-entity entry point that runs Stage 1 → 2 → 3 → 4 →
-  (Stage 5 when the band says so) → Stage 6 and returns a per-entity result carrying at
-  minimum: resolved canonical id (or a "new entity" marker), final confidence, the match
-  type, and the `Disposition` that produced it. Feature 12 names this result type; it is
-  NOT defined anywhere in the tree yet, so refer to it by role, not by name.
-- `core/ingestion/pipeline.py` — a batch driver that pulls from a `ConnectorInterface`,
-  normalizes, matches, and returns a per-disposition summary.
-- Feature 12's brief also references a registry abstraction as the second `match()`
-  argument. No such type exists today; Stages 1–3 currently take a live
-  `sqlite3.Connection` (see `core/graph/entity_store.py`, `core/matching/blocking.py`,
-  `core/matching/scoring.py`, `core/matching/disposition.py`). **Feature 13 must consume
-  whichever of the two feature 12 actually ships** — connection or registry — and must not
-  hard-code the other. Confirm against feature 12 at build time.
+- `core/matching/engine.py` — `engine.match(incoming, ctx) -> MatchResult`, the single-entity
+  entry point that runs Stage 1 → 2 → 3 → 4 → (Stage 5 when the band says so) → Stage 6 and
+  returns a per-entity result carrying: resolved canonical id (or a "new entity" marker),
+  final confidence, the match type, and the `Disposition` that produced it.
+- `core/ingestion/pipeline.py` — `run_ingestion(connector, conn, tenant_id, llm_client=None)
+  -> IngestionSummary`, the batch driver that pulls from a `ConnectorInterface`, matches, and
+  returns a per-disposition summary.
+- `MatchContext` is the second `match()` argument and settles the registry-vs-connection
+  question in favor of the connection: it carries the live `sqlite3.Connection` alongside the
+  token, n-gram and embedding indexes, `tenant_id`, and the LLM client. No registry type
+  exists; do not hard-code one.
 
 **From feature 11 (approval queue):**
 - A pending-review record that the queue reads. Feature 11's brief points at the
   `approval_decisions` table, which per the rules file exists in the **Postgres** schema
   only and is never created or queried at runtime; `db/schema_sqlite.sql` has no approvals
-  table. Feature 11 must therefore define where a pending item lives. Feature 13 needs from
-  it exactly one thing: **a way to hand a cluster to the queue as a pending item that
-  carries its member pairs, aggregate confidence, and recommended action.** Everything else
-  about the queue is feature 11's business.
+  table. Feature 11 shipped the runtime home instead: the pending-decision store, its SQLite
+  migration, and the approvals router. Feature 13 needs from it exactly one thing: **a way to
+  hand cluster members to the queue as pending items carrying their pairs, confidence, and
+  recommended action.** Everything else about the queue is feature 11's business.
 - Feature 11 already surfaces `Disposition.abbreviation_rescue`; cold-start clusters must
   preserve that flag on their member pairs rather than re-deriving it.
 
@@ -60,12 +58,17 @@ guess at their internals, and do not treat any of them as present when writing c
 ### In Scope
 
 - Create `core/ingestion/historical.py`:
-  - `seed_from_history(qb_connector, ruddr_connector, tenant_id)` — pulls the full entity
-    set from both connectors. Note the shipped `ConnectorInterface` contract: entities come
-    from `read_entities(entity_type, filters)` (no date range), and historical *transactions*
-    come from `read_transactions(date_range)` taking a `connectors.base.DateRange`. There is
-    no "pull everything" method — the seeder iterates entity types itself.
-  - Feeds each raw record through `normalize_entity()` (Stage 0) before matching.
+  - `seed_from_history(qb_connector, ruddr_connector, conn, tenant_id, llm_client=None)` —
+    pulls the full entity set from both connectors. Note the shipped `ConnectorInterface`
+    contract: entities come from `read_entities(entity_type, filters)` (no date range), and
+    historical *transactions* come from `read_transactions(date_range)` taking a
+    `connectors.base.DateRange`. There is no "pull everything" method — the seeder iterates
+    entity types itself.
+  - It calls `run_ingestion` once per connector against the same `conn` — one connector per
+    call — pulling entity types via the pipeline's existing per-category entity-type mapping,
+    and must not request both `"customer"` and `"client"` from a single connector.
+  - The connectors already return normalized entities, so there is no Stage 0
+    `normalize_entity()` call in this feature.
   - Drives the feature 12 orchestrator over the normalized set, then groups the resulting
     dispositions into cross-category clusters for guided review.
   - Cold start surfaces more for human review than steady state. See the open threshold
@@ -90,16 +93,14 @@ guess at their internals, and do not treat any of them as present when writing c
     `LLM_FALLBACK_THRESHOLD`. Widening the cold-start band therefore has no seam today —
     see Open Decisions.
   - `llm_fallback.MAX_LLM_CALLS_PER_RUN` is a hard cap that raises `LLMBudgetExceededError`,
-    not a soft budget. A cold-start run that exceeds it fails rather than degrades. See
-    Open Decisions.
+    not a soft budget. See Open Decisions.
   - Results populate the onboarding queue, never auto-approve. This is already enforced:
     `llm_assess` always returns `action="QUEUE_FOR_REVIEW"`.
   - Abbreviation-rescue pairs (PSA↔Accounting, heuristic fired, score in the LLM band) skip
     the LLM by design and route straight to human review. Cold start must honor this.
 
-- Guided onboarding output: structured list of clusters for the approval queue, prioritized
-  by confidence and business impact (higher transaction volume = higher priority; volume is
-  readable from the shipped `transactions` table).
+- Guided onboarding output: structured list of clusters for the approval queue, ranked by
+  aggregate confidence and then cluster size.
 
 - **Test suite:** `tests/test_historical.py`
   - Seed an empty graph with the fixture set (`tests/fixtures/qb_entities.json`,
@@ -120,6 +121,8 @@ guess at their internals, and do not treat any of them as present when writing c
 - Onboarding wizard UI — separate feature
 - Incremental sync (delta detection) — V1 uses full re-pull
 - Cross-category schema drift detection — separate feature
+- Transaction-volume prioritization — deferred until a feature owns transaction ingestion,
+  because the fixture connectors return no transactions today.
 - Changing any shipped threshold constant. If cold start needs a different band, that is a
   scope change to `core/matching/disposition.py`, not a side effect of this feature.
 
@@ -133,12 +136,17 @@ guess at their internals, and do not treat any of them as present when writing c
    (b) cold start calling `score_candidate_set` and doing its own banding, bypassing Stage 4
    — which forfeits cluster-conflict detection and abbreviation rescue, or (c) dropping the
    wider band and using the steady-state one. Pick one before build.
-2. **LLM call cap.** `MAX_LLM_CALLS_PER_RUN` is enforced by exception. A full-history cold
-   start over a real tenant will plausibly exceed it. Decide: raise the cap for cold start,
-   make cold start batch across multiple runs with `reset_call_budget()`, or degrade
-   gracefully to human review on cap. "Budget for N calls" is not a mechanism.
-3. **Where a pending cluster is stored.** No runtime approvals table exists. Feature 11 must
-   define it; if feature 11 ships without one, feature 13 has nowhere to write and is blocked.
+2. **LLM call cap — DECIDED: degrade, do not fail.** The shipped orchestrator already catches
+   the budget-exceeded failure inside `match()` and rewrites the disposition to
+   queue-for-review, and the ingestion run resets the call budget once per run. A cold start
+   that exhausts the cap therefore sends the remainder to human review rather than raising.
+   Cold start must go through `match()` so it inherits this behavior; the cap is not raised
+   and no new budget mechanism is built.
+3. **Where a pending cluster is stored — DECIDED: no cluster-level storage.** A cluster is an
+   in-memory return value from `cluster_entities()` plus one enqueued pending row per member
+   entity, written through the shipped pending-decision store. **No cluster-level table and no
+   schema change is in scope.** `approval_decisions` remains Postgres-only and is neither
+   created nor queried at runtime.
 
 ---
 
@@ -164,8 +172,8 @@ guess at their internals, and do not treat any of them as present when writing c
 
 ## Dependencies
 
-- [ ] Matcher orchestrator (feature 12) — NOT BUILT. Forward dependency; see contract above.
-- [ ] Approval queue (feature 11) — NOT BUILT. Forward dependency; see contract above.
+- [x] Matcher orchestrator (feature 12) — SHIPPED; see upstream contracts above.
+- [x] Approval queue (feature 11) — SHIPPED; see upstream contracts above.
 - [x] Both connectors (features 5, 6) — shipped, fixture-backed
 - [x] Normalizer (feature 3), scoring (8/8a/8b), disposition + LLM fallback (9),
       resolution (10) — shipped
@@ -177,9 +185,9 @@ guess at their internals, and do not treat any of them as present when writing c
 **Rating:** M
 
 **Rationale:** Clustering logic is the new work — the rest reuses the shipped pipeline. The
-real cost is not the clustering algorithm; it is the two unresolved seams above (band
-widening and the LLM call cap), both of which touch shipped modules this feature is not
-supposed to modify. Resolve those before estimating build time.
+real cost is not the clustering algorithm; it is the one unresolved seam above (band
+widening), which touches a shipped module this feature is not supposed to modify. Resolve
+that before estimating build time.
 
 ---
 

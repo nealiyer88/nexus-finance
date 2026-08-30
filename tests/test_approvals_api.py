@@ -218,27 +218,6 @@ def _route_pairs(routes) -> set:
     return pairs
 
 
-def _load_head_module(rel_path: str, module_name: str) -> types.ModuleType:
-    """Exec the `HEAD` revision of `rel_path` into an isolated module
-    namespace, so 'before this feature' values are derived from git
-    history rather than transcribed into this test."""
-    result = subprocess.run(
-        ["git", "show", f"HEAD:{rel_path}"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    module = types.ModuleType(module_name)
-    module.__file__ = str(REPO_ROOT / rel_path)
-    sys.modules[module_name] = module
-    try:
-        exec(compile(result.stdout, module.__file__, "exec"), module.__dict__)
-    finally:
-        sys.modules.pop(module_name, None)
-    return module
-
-
 # ---------------------------------------------------------------------------
 # 1-3. Router shape / reachability / additive registration
 # ---------------------------------------------------------------------------
@@ -496,37 +475,97 @@ def test_approve_drives_stage6_from_row_alone(client, store_path):
     assert outcome == "CLIENT_APPROVE"
 
 
+def _required_parameters(fn) -> set:
+    """Names of `fn`'s parameters that a caller MUST supply."""
+    return {
+        name
+        for name, param in inspect.signature(fn).parameters.items()
+        if param.default is inspect.Parameter.empty
+        and param.kind
+        in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+    }
+
+
 def test_argument_coverage_is_derived_not_enumerated(store_path):
+    """Every routed Stage 6 writer must be demonstrably called with all of
+    its required arguments, with no argument list transcribed here.
+
+    The router's own decision functions are driven for real; only the
+    writer itself is swapped for a recorder that carries the real
+    writer's signature (which is what the router's dispatcher introspects
+    to decide what to pass). Binding the recorded call against the real
+    signature is the coverage proof: a missing required argument raises
+    `TypeError` at `bind`. Checked per writer, so a writer whose
+    proposal-sourced remainder happens to be empty still has its full
+    required set verified — it cannot ride along on another writer.
+    """
     tenant_id = str(uuid.uuid4())
-    pending_id = _seed_pending(store_path, tenant_id, "CLIENT_COVERAGE", score=0.8)
-    conn = sqlite3.connect(store_path)
-    try:
-        pending = get_pending(conn, pending_id, tenant_id)
-    finally:
-        conn.close()
-    _disposition, _entity, proposal = rehydrate(pending)
 
-    writers = {resolve_match, reject_match}
-    assert writers
+    # Each routed writer, paired with the router entry point that routes
+    # to it. Argument NAMES are never written down — only these two
+    # routing facts, which are what the test is about.
+    routes = (
+        (resolve_match, "resolve_match", approvals_mod.approve_decision, "CLIENT_COV_APPROVE"),
+        (reject_match, "reject_match", approvals_mod.reject_decision, "CLIENT_COV_REJECT"),
+    )
+    assert routes
 
-    base_caller_supplied = {"conn", "disposition", "entity", "reasoning_trace", "tenant_id"}
-    union_remainder: set = set()
-    for fn in writers:
-        params = inspect.signature(fn).parameters
-        caller_supplied = set(base_caller_supplied)
-        if "approved_by" in params:
-            caller_supplied.add("approved_by")
-        if fn is reject_match:
-            caller_supplied.add("rejected_canonical_id")
-        remainder = {
-            name
-            for name, p in params.items()
-            if name not in caller_supplied and p.default is inspect.Parameter.empty
-        }
-        assert remainder <= set(proposal.keys())
-        union_remainder |= remainder
+    proposal_sourced: set = set()
+    for index, (writer, attr_name, decide, canonical_id) in enumerate(routes):
+        pending_id = _seed_pending(
+            store_path,
+            tenant_id,
+            canonical_id,
+            score=0.8,
+            source_entity_id=f"cov-{index}",
+            source_id=f"COV-{index}",
+        )
+        conn = sqlite3.connect(store_path)
+        try:
+            pending = get_pending(conn, pending_id, tenant_id)
+            assert pending is not None
+            _disposition, _entity, proposal = rehydrate(pending)
+            assert proposal
 
-    assert union_remainder
+            signature = inspect.signature(writer)
+            required = _required_parameters(writer)
+            # Non-emptiness precondition: a writer with no required
+            # arguments would make the coverage claim below meaningless.
+            assert required, f"{attr_name} has no required arguments to cover"
+
+            recorded: list = []
+
+            def _recorder(*args, **kwargs):
+                recorded.append((args, kwargs))
+                return canonical_id
+
+            _recorder.__signature__ = signature
+
+            with mock.patch.object(approvals_mod, attr_name, _recorder):
+                decide(conn, tenant_id, pending_id)
+
+            assert len(recorded) == 1, f"{attr_name} was not routed to exactly once"
+            args, kwargs = recorded[0]
+            # Raises TypeError if any required argument was not supplied.
+            bound = signature.bind(*args, **kwargs)
+            supplied = set(bound.arguments)
+            assert required <= supplied, (
+                f"{attr_name} called without required arguments: "
+                f"{sorted(required - supplied)}"
+            )
+
+            for name in required & set(proposal):
+                assert bound.arguments[name] == proposal[name], (
+                    f"{attr_name} received {name}={bound.arguments[name]!r}, "
+                    f"not the rehydrated proposal's {proposal[name]!r}"
+                )
+            proposal_sourced |= required & set(proposal)
+        finally:
+            conn.close()
+
+    # At least one required argument really came out of the rehydrated
+    # proposal — otherwise the value checks above never ran on anything.
+    assert proposal_sourced
 
 
 # ---------------------------------------------------------------------------
@@ -1105,6 +1144,34 @@ def test_connection_provider_opens_yields_and_closes(store_path):
         conn.execute("SELECT 1")
 
 
+def test_connection_provider_bootstraps_schema_at_a_fresh_path(tmp_path, monkeypatch):
+    """Regression (feature 11 runtime defect): `get_connection` resolved a
+    path that nothing ever applied the schema to, so SQLite silently made
+    an empty file and every real query died with
+    `no such table: pending_decisions`. A fresh path must yield a working
+    store, and reopening it must not re-provision over existing rows."""
+    from core.matching.pending_store import list_pending
+
+    path = tmp_path / "fresh-store.db"
+    assert not path.exists()
+    monkeypatch.setenv("NEXUS_STORE_PATH", str(path))
+
+    # A real query against the store's own table, on a path with no schema.
+    with pending_store_mod.get_connection() as conn:
+        assert list_pending(conn, tenant_id=None) == []
+
+    # And the store is genuinely writable through the normal 10b path,
+    # including the graph table `enqueue_pending` tenant-checks against.
+    tenant_id = str(uuid.uuid4())
+    pending_id = _seed_pending(path, tenant_id, "CLIENT_BOOTSTRAP", score=0.8)
+
+    # Re-opening is idempotent: the second bootstrap pass must not drop,
+    # recreate, or otherwise disturb the row written above.
+    with pending_store_mod.get_connection() as conn:
+        rows = list_pending(conn, tenant_id=tenant_id)
+    assert [row.pending_id for row in rows] == [pending_id]
+
+
 def test_connection_provider_closes_on_exception(store_path):
     captured = {}
     with pytest.raises(RuntimeError):
@@ -1147,26 +1214,103 @@ def test_router_constructs_no_connection_of_its_own(client, store_path):
 # ---------------------------------------------------------------------------
 
 
-def test_10b_contract_unchanged():
-    head_module = _load_head_module("core/matching/pending_store.py", "_head_pending_store_test11")
-    fn_names = [
-        name
-        for name in ("list_pending", "get_pending", "rehydrate", "mark_decided")
-        if hasattr(head_module, name)
-    ]
-    assert fn_names
-    for name in fn_names:
-        before_sig = inspect.signature(getattr(head_module, name))
-        after_sig = inspect.signature(getattr(pending_store_mod, name))
-        assert before_sig == after_sig
+# Feature 11 is the revision that added a connection provider to 10b's
+# store module. Its presence is what distinguishes a post-11 revision of
+# `core/matching/pending_store.py` from the 10b revision this test
+# compares against — derived from source text, never from a commit sha.
+_FEATURE_11_STORE_MARKER = "def get_connection"
 
-    result = subprocess.run(
-        ["git", "diff", "--", "db/migrations/"],
+_PENDING_STORE_REL_PATH = "core/matching/pending_store.py"
+
+
+def _pre_feature11_store_revisions() -> tuple[str, str, str]:
+    """Walk `pending_store.py`'s history for the last revision that
+    predates feature 11's additions.
+
+    Returns `(introducing_sha, pre_change_sha, pre_change_source)`.
+    Walking history — the same approach `_load_pre_registration_main_module`
+    takes for `api/main.py` — is what keeps this honest: `HEAD` is the ship
+    commit for this feature, so a `HEAD`-based comparison would diff the
+    changed file against itself and could never fail.
+    """
+    shas = subprocess.run(
+        ["git", "log", "--format=%H", "--follow", "--", _PENDING_STORE_REL_PATH],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        check=True,
+    ).stdout.split()
+    assert shas, f"no git history for {_PENDING_STORE_REL_PATH}"
+    for index, sha in enumerate(shas):
+        content = subprocess.run(
+            ["git", "show", f"{sha}:{_PENDING_STORE_REL_PATH}"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        if _FEATURE_11_STORE_MARKER in content:
+            continue
+        assert index > 0, (
+            "no revision of pending_store.py introduces "
+            f"{_FEATURE_11_STORE_MARKER!r} — this test's marker is stale"
+        )
+        return shas[index - 1], sha, content
+    raise AssertionError(
+        f"every revision of {_PENDING_STORE_REL_PATH} already contains "
+        f"{_FEATURE_11_STORE_MARKER!r}"
     )
-    assert result.stdout == ""
+
+
+def test_10b_contract_unchanged():
+    introducing_sha, pre_change_sha, pre_change_source = _pre_feature11_store_revisions()
+
+    module = types.ModuleType("_pre_feature11_pending_store_test11")
+    module.__file__ = str(REPO_ROOT / _PENDING_STORE_REL_PATH)
+    sys.modules[module.__name__] = module
+    try:
+        exec(compile(pre_change_source, module.__file__, "exec"), module.__dict__)
+    finally:
+        sys.modules.pop(module.__name__, None)
+
+    expected_names = ("list_pending", "get_pending", "rehydrate", "mark_decided")
+    fn_names = [name for name in expected_names if hasattr(module, name)]
+    # 10b defined all four; a missing one is itself a broken contract, so
+    # this is an equality check, not a filter that can silently empty out.
+    assert fn_names == list(expected_names), (
+        f"{pre_change_sha} is missing 10b store functions: "
+        f"{sorted(set(expected_names) - set(fn_names))}"
+    )
+    for name in fn_names:
+        before_sig = inspect.signature(getattr(module, name))
+        after_sig = inspect.signature(getattr(pending_store_mod, name))
+        assert before_sig == after_sig, f"{name} signature changed since {pre_change_sha}"
+
+    # Feature 11 (including its follow-up fixes) added no migration and
+    # altered none. Diffing against the parent of the commit that
+    # introduced the feature-11 changes — rather than the working tree
+    # against HEAD, which is trivially empty once committed — makes this
+    # capable of failing.
+    pre_feature_tree = f"{introducing_sha}^"
+    listed = subprocess.run(
+        ["git", "ls-tree", "--name-only", pre_feature_tree, "db/migrations/"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    assert listed, f"db/migrations/ is empty at {pre_feature_tree}"
+
+    diff = subprocess.run(
+        ["git", "diff", pre_feature_tree, "--", "db/migrations/"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert diff.stdout == "", (
+        f"db/migrations/ changed since {pre_feature_tree}:\n{diff.stdout}"
+    )
 
 
 # ---------------------------------------------------------------------------

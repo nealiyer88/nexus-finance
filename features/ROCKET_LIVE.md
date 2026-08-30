@@ -409,3 +409,19 @@ The approval queue feature (11) has three critical blockers flagged before build
 ### 2026-08-29T21:41:39 · 11 · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
 
 ### 2026-08-29T21:41:46 · 11 · 🚦 full gates PASS — clear to ship
+
+### 2026-08-29T21:41:46 · 11 · ✅ SHIPPED — both reviews PASS, queue flipped, committed (~$12.1353 spent).
+
+### 2026-08-29T21:41:46 · 13 · 🚀 Starting 13 (historical-cold-start.md)
+
+### 2026-08-29T21:41:46 · 13 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-29T21:43:29 · 13 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+Feature 13's brief assumes critical dependencies (features 11–12) don't exist, but they're already built and shipping—this creates a major compatibility issue. The proposed seeding function is incomplete (missing a required database connection), and several implementation details contradict how the code actually works today (re-normalizing already-normalized data, LLM handling that's already implemented). The feature needs decisions on how to integrate with existing infrastructure rather than reimplementing parts of the matching pipeline.
+
+### 2026-08-29T21:43:41 · 14 · 🚀 Starting 14 (overview-entity-browser.md)
+
+### 2026-08-29T21:43:41 · 14 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-29T21:45:57 · 14 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The build step checked whether the planned dashboard feature could actually be built as described and found the plan was based on outdated assumptions—several supporting pieces were already shipped by earlier features, and the instructions didn't account for how the system actually handles database connections and user access. It flagged four specific mismatches between what the plan says exists and what's actually in the code, along with one testability gotcha the team needs to work around. The verdict is to stop and resolve these plan errors before building.
