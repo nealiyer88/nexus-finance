@@ -466,3 +466,28 @@ Error: Exceeded USD budget (0.25)
 
 ### 2026-08-29T22:22:48 · 15 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
 The reality check found that the feature brief contains outdated information—several things it assumes don't exist are actually already shipped in the codebase, and the brief's description of the current API structure is incorrect. Five mismatches need quick clarification (mainly about tenant handling and database access patterns) and one genuine open decision still needs to be made before the builder can start. These issues won't block development but need resolving so the builder doesn't restructure things that already exist or write code inconsistent with the rest of the system.
+
+### 2026-08-29T22:34:03 · 12A · 🚀 Starting 12a (transaction-ingestion.md)
+
+### 2026-08-29T22:34:03 · 12A · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-29T22:37:43 · 12A · ✅ reality check GO — brief matches the current repo
+
+### 2026-08-29T22:39:27 · 12A · 📝 Wrote the build prompt
+The build specified a transaction writer that injects financial data from QuickBooks and time-entry records from RUDDR into a shared SQLite database, cross-referencing each transaction against existing canonical entities without fuzzy-matching or guessing. It decided to keep counterparty resolution simple—exact lookups only—and to require both connectors to use the same tenant so their amounts can be compared for deduplication. The spec ensures idempotent re-runs (safe to call twice), preserves NULL values rather than substituting defaults, and bridges directly to the B3 amount-matching signal that powers the core deduplication engine.
+
+### 2026-08-29T22:39:40 · 12A · 🔨 Builder starting — code + tests + commit
+### 22:39:52 · 12a · 🔨 building
+### 22:46:25 · 12a · 🧪 tests green (611 passed)
+
+### 2026-08-29T22:47:02 · 12A · 🧹 fast gates PASS
+
+### 2026-08-29T22:47:02 · 12A · 🔍 qa review running
+
+### 2026-08-29T22:49:23 · 12A · 🔍 code review running
+
+### 2026-08-29T22:50:19 · 12A · 🧪 review round 1 — QA=PASS Code=PASS
+
+### 2026-08-29T22:50:19 · 12A · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
+
+### 2026-08-29T22:50:25 · 12A · 🚦 full gates PASS — clear to ship

@@ -407,3 +407,14 @@
 | 2026-08-29T22:22:48 | 15 | cost:reality-check | claude | $0.9779265 |
 | 2026-08-29T22:22:48 | 15 | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/15-reality-check.md |
 | 2026-08-29T22:22:48 | 15 | reality-check | opus | FLAG (blocked; see features/_reality/15-reality-check.md) |
+| 2026-08-29T22:37:43 | 12a | cost:reality-check | claude | $1.7011044999999998 |
+| 2026-08-29T22:37:43 | 12a | reality-check | opus | GO |
+| 2026-08-29T22:39:27 | 12a | cost:promptgen | claude | $0.6405114999999999 |
+| 2026-08-29T22:39:27 | 12a | prompt-gen | opus | done |
+| 2026-08-29T22:47:02 | 12a | cost:build-session | claude | $2.3774834000000005 |
+| 2026-08-29T22:47:02 | 12a | gates:pre-merge | — | PASS (features/_logs/12a-gates-pre-merge.md) |
+| 2026-08-29T22:49:23 | 12a | cost:review-qa | claude | $0.827748 |
+| 2026-08-29T22:50:19 | 12a | cost:review-code | claude | $0.46884620000000005 |
+| 2026-08-29T22:50:19 | 12a | qb-validation | — | SKIPPED (QB gate off / no QB keywords) |
+| 2026-08-29T22:50:19 | 12a | exercise-gate | hook | SKIPPED (no project exercise script) |
+| 2026-08-29T22:50:25 | 12a | gates:post-integration | — | PASS (features/_logs/12a-gates-post-integration.md) |

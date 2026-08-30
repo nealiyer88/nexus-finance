@@ -57,3 +57,9 @@ Brief: features/dashboard/overview-entity-browser.md
 Tests: 588 passed
 Reviews: QA PASS (blind), Code PASS
 Gates: QB=NOT RUN, Exercise=SKIPPED
+
+## 2026-08-29 — 12a (shipped by rocket)
+Brief: features/pipeline/transaction-ingestion.md
+Tests: 611 passed
+Reviews: QA PASS (blind), Code PASS
+Gates: QB=NOT RUN, Exercise=SKIPPED
