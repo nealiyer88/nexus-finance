@@ -491,3 +491,30 @@ The build specified a transaction writer that injects financial data from QuickB
 ### 2026-08-29T22:50:19 · 12A · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
 
 ### 2026-08-29T22:50:25 · 12A · 🚦 full gates PASS — clear to ship
+
+### 2026-08-29T22:50:25 · 12A · ✅ SHIPPED — both reviews PASS, queue flipped, committed (~$6.0156 spent).
+
+### 2026-08-29T22:50:25 · 13 · 🚀 Starting 13 (historical-cold-start.md)
+
+### 2026-08-29T22:50:25 · 13 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-29T22:52:27 · 13 · ✅ reality check GO — brief matches the current repo
+
+### 2026-08-29T22:53:25 · 13 · 📝 Wrote the build prompt
+The build will create cold-start seeding and cross-category clustering modules that load historical accounting and PSA data into the graph, group entities likely to match across the two systems, and queue candidates for human review. Three new files (two modules and a test suite) must be built end-to-end with all tests passing before commit, with no modifications to shipped features.
+
+### 2026-08-29T22:53:33 · 13 · 🔨 Builder starting — code + tests + commit
+### 22:56:18 · 13 · 🔨 building
+### 22:57:44 · 13 · 🧪 tests green (621 passed)
+
+### 2026-08-29T22:58:33 · 13 · 🧹 fast gates PASS
+
+### 2026-08-29T22:58:33 · 13 · 🔍 qa review running
+
+### 2026-08-29T22:59:53 · 13 · 🔍 code review running
+
+### 2026-08-29T23:00:39 · 13 · 🧪 review round 1 — QA=PASS Code=PASS
+
+### 2026-08-29T23:00:39 · 13 · 🕹️ exercise gate SKIPPED — app NOT exercised (no project script; recorded as skipped, NOT a pass)
+
+### 2026-08-29T23:00:47 · 13 · 🚦 full gates PASS — clear to ship

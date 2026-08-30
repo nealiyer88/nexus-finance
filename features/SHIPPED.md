@@ -63,3 +63,9 @@ Brief: features/pipeline/transaction-ingestion.md
 Tests: 611 passed
 Reviews: QA PASS (blind), Code PASS
 Gates: QB=NOT RUN, Exercise=SKIPPED
+
+## 2026-08-29 — 13 (shipped by rocket)
+Brief: features/data/historical-cold-start.md
+Tests: 621 passed
+Reviews: QA PASS (blind), Code PASS
+Gates: QB=NOT RUN, Exercise=SKIPPED
