@@ -51,3 +51,9 @@ Brief: features/dashboard/approval-queue.md
 Tests: 577 passed
 Reviews: QA PASS (blind), Code PASS
 Gates: QB=NOT RUN, Exercise=SKIPPED
+
+## 2026-08-29 — 14 (shipped by rocket)
+Brief: features/dashboard/overview-entity-browser.md
+Tests: 588 passed
+Reviews: QA PASS (blind), Code PASS
+Gates: QB=NOT RUN, Exercise=SKIPPED
