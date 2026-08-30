@@ -366,3 +366,6 @@
 | 2026-08-24T23:17:45 | 11 | cost:reality-check | claude | $1.250841 |
 | 2026-08-24T23:17:45 | 11 | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/11-reality-check.md |
 | 2026-08-24T23:17:45 | 11 | reality-check | opus | FLAG (blocked; see features/_reality/11-reality-check.md) |
+| 2026-08-29T20:55:37 | 11 | cost:reality-check | claude | $1.6804724999999998 |
+| 2026-08-29T20:55:37 | 11 | BLOCKED | — | reality check FLAG — brief no longer matches the repo; report: features/_reality/11-reality-check.md |
+| 2026-08-29T20:55:37 | 11 | reality-check | opus | FLAG (blocked; see features/_reality/11-reality-check.md) |
