@@ -425,3 +425,23 @@ Feature 13's brief assumes critical dependencies (features 11–12) don't exist,
 
 ### 2026-08-29T21:45:57 · 14 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
 The build step checked whether the planned dashboard feature could actually be built as described and found the plan was based on outdated assumptions—several supporting pieces were already shipped by earlier features, and the instructions didn't account for how the system actually handles database connections and user access. It flagged four specific mismatches between what the plan says exists and what's actually in the code, along with one testability gotcha the team needs to work around. The verdict is to stop and resolve these plan errors before building.
+
+### 2026-08-29T22:01:03 · 13 · 🚀 Starting 13 (historical-cold-start.md)
+
+### 2026-08-29T22:01:03 · 13 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-29T22:03:28 · 13 · 🚩 reality check FLAG — brief vs repo mismatch; feature BLOCKED for human review
+The reality check found that most underlying systems feature 13 depends on are working correctly, but two unresolved design questions are blocking the build. The spec doesn't clarify how to handle entities that won't have matching scores in a cold-start scenario, and the team still hasn't chosen which confidence-adjustment option to use for that scenario. Both decisions must be made before the build can proceed.
+
+### 2026-08-29T22:03:36 · 14 · 🚀 Starting 14 (overview-entity-browser.md)
+
+### 2026-08-29T22:03:36 · 14 · 🔎 reality check running (brief vs current repo)
+
+### 2026-08-29T22:06:32 · 14 · ✅ reality check GO — brief matches the current repo
+
+### 2026-08-29T22:07:49 · 14 · 📝 Wrote the build prompt
+Error: Exceeded USD budget (0.25)
+
+### 2026-08-29T22:11:11 · 14 · 🔨 Builder starting — code + tests + commit
+### 22:17:25 · 14 · 🔨 building
+### 22:17:31 · 14 · 🧪 tests green (588 passed)

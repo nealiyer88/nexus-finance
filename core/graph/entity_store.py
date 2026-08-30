@@ -588,6 +588,378 @@ def count_amount_cooccurrence_periods(
 
 
 # ---------------------------------------------------------------------------
+# Feature 14 reads (Overview dashboard / Entity Registry Browser)
+#
+# List/aggregate/grouped-alias reads the shipped store lacks — Stages 1-4
+# above are all per-canonical point lookups. Same conventions: `conn`
+# first, `tenant_id: Optional[str] = None` last, no WHERE filter when
+# `tenant_id` is None, child tables joined back to `canonical_entities`
+# for tenant scoping since they carry no `tenant_id` column of their own.
+# ---------------------------------------------------------------------------
+
+
+def get_canonical_entity(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    """Return the full `canonical_entities` row for `canonical_id` as a
+    dict, or None if absent (or out of tenant scope)."""
+    if tenant_id is None:
+        row = conn.execute(
+            """
+            SELECT canonical_id, canonical_name, entity_type, entity_category,
+                   confidence, created_at, updated_at
+              FROM canonical_entities
+             WHERE canonical_id = ?
+            """,
+            (canonical_id,),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            """
+            SELECT canonical_id, canonical_name, entity_type, entity_category,
+                   confidence, created_at, updated_at
+              FROM canonical_entities
+             WHERE canonical_id = ?
+               AND tenant_id = ?
+            """,
+            (canonical_id, tenant_id),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "canonical_id": row[0],
+        "canonical_name": row[1],
+        "entity_type": row[2],
+        "entity_category": row[3],
+        "confidence": row[4],
+        "created_at": row[5],
+        "updated_at": row[6],
+    }
+
+
+def list_canonical_entities(
+    conn: sqlite3.Connection,
+    tenant_id: Optional[str] = None,
+    entity_type: Optional[str] = None,
+    entity_category: Optional[str] = None,
+    min_confidence: Optional[float] = None,
+    max_confidence: Optional[float] = None,
+    source_category: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    """Return canonical entity rows for the entity browser table:
+    `canonical_id`, `canonical_name`, `entity_type`, `entity_category`,
+    `confidence`, `alias_count`, `source_categories` (the sorted list of
+    distinct `entity_aliases.category` values for that canonical).
+
+    `entity_category` filters on `canonical_entities.entity_category`
+    ('organization' | 'person'); `source_category` filters on the
+    source-system category carried by `entity_aliases.category` — the
+    two are never conflated (rules note in the feature brief). No
+    `LIMIT` clause is emitted when `limit` is None, so callers that need
+    the full filtered set (e.g. to intersect with a fuzzy-search result)
+    can fetch it in one call. Ordered by `canonical_id` for determinism.
+    """
+    where = ["1 = 1"]
+    params: list[Any] = []
+
+    if tenant_id is not None:
+        where.append("c.tenant_id = ?")
+        params.append(tenant_id)
+    if entity_type is not None:
+        where.append("c.entity_type = ?")
+        params.append(entity_type)
+    if entity_category is not None:
+        where.append("c.entity_category = ?")
+        params.append(entity_category)
+    if min_confidence is not None:
+        where.append("c.confidence >= ?")
+        params.append(min_confidence)
+    if max_confidence is not None:
+        where.append("c.confidence <= ?")
+        params.append(max_confidence)
+    if source_category is not None:
+        where.append(
+            """
+            EXISTS (
+                SELECT 1 FROM entity_aliases AS sc
+                 WHERE sc.canonical_id = c.canonical_id
+                   AND sc.category = ?
+            )
+            """
+        )
+        params.append(source_category)
+
+    sql = f"""
+        SELECT
+            c.canonical_id,
+            c.canonical_name,
+            c.entity_type,
+            c.entity_category,
+            c.confidence,
+            (SELECT COUNT(*) FROM entity_aliases AS a
+              WHERE a.canonical_id = c.canonical_id) AS alias_count,
+            (SELECT GROUP_CONCAT(DISTINCT a2.category) FROM entity_aliases AS a2
+              WHERE a2.canonical_id = c.canonical_id) AS source_categories
+          FROM canonical_entities AS c
+         WHERE {' AND '.join(where)}
+         ORDER BY c.canonical_id
+    """
+    if limit is not None:
+        sql += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+    rows = conn.execute(sql, params).fetchall()
+    results: list[dict[str, Any]] = []
+    for cid, name, etype, ecat, confidence, alias_count, cats in rows:
+        source_categories = sorted(cats.split(",")) if cats else []
+        results.append(
+            {
+                "canonical_id": cid,
+                "canonical_name": name,
+                "entity_type": etype,
+                "entity_category": ecat,
+                "confidence": confidence,
+                "alias_count": int(alias_count),
+                "source_categories": source_categories,
+            }
+        )
+    return results
+
+
+def count_canonical_entities(
+    conn: sqlite3.Connection,
+    tenant_id: Optional[str] = None,
+    min_confidence: Optional[float] = None,
+    created_after: Optional[str] = None,
+) -> int:
+    """Return `COUNT(canonical_entities)` in tenant scope, optionally
+    filtered to `confidence >= min_confidence` and/or
+    `created_at >= created_after` (an ISO-8601 string, compared as text —
+    matching this store's existing `created_at` storage convention).
+    """
+    where = ["1 = 1"]
+    params: list[Any] = []
+    if tenant_id is not None:
+        where.append("tenant_id = ?")
+        params.append(tenant_id)
+    if min_confidence is not None:
+        where.append("confidence >= ?")
+        params.append(min_confidence)
+    if created_after is not None:
+        where.append("created_at >= ?")
+        params.append(created_after)
+
+    row = conn.execute(
+        f"SELECT COUNT(*) FROM canonical_entities WHERE {' AND '.join(where)}",
+        params,
+    ).fetchone()
+    return int(row[0]) if row else 0
+
+
+def count_cross_category_entities(
+    conn: sqlite3.Connection,
+    tenant_id: Optional[str] = None,
+) -> int:
+    """Count canonical entities whose aliases span >= 2 distinct
+    `entity_aliases.category` values (Cross-Category Coverage
+    numerator)."""
+    if tenant_id is None:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) FROM (
+                SELECT canonical_id
+                  FROM entity_aliases
+                 GROUP BY canonical_id
+                HAVING COUNT(DISTINCT category) >= 2
+            )
+            """
+        ).fetchone()
+    else:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) FROM (
+                SELECT a.canonical_id
+                  FROM entity_aliases AS a
+                  JOIN canonical_entities AS c ON c.canonical_id = a.canonical_id
+                 WHERE c.tenant_id = ?
+                 GROUP BY a.canonical_id
+                HAVING COUNT(DISTINCT a.category) >= 2
+            )
+            """,
+            (tenant_id,),
+        ).fetchone()
+    return int(row[0]) if row else 0
+
+
+def get_aliases_grouped_by_category(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> dict[str, list[str]]:
+    """Return `entity_aliases.value`s for `canonical_id`, grouped by
+    `entity_aliases.category` (the source-system category). Excludes no
+    rows — unlike `get_aliases`, the canonical-name seed alias is not
+    special-cased here, since this reads raw stored rows for display."""
+    if tenant_id is None:
+        rows = conn.execute(
+            """
+            SELECT category, value FROM entity_aliases
+             WHERE canonical_id = ?
+             ORDER BY category, value
+            """,
+            (canonical_id,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT a.category, a.value
+              FROM entity_aliases AS a
+              JOIN canonical_entities AS c ON c.canonical_id = a.canonical_id
+             WHERE a.canonical_id = ?
+               AND c.tenant_id = ?
+             ORDER BY a.category, a.value
+            """,
+            (canonical_id, tenant_id),
+        ).fetchall()
+    grouped: dict[str, list[str]] = {}
+    for category, value in rows:
+        grouped.setdefault(category, []).append(value)
+    return grouped
+
+
+def get_system_references(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    """Return every `system_references` row for `canonical_id` as a dict
+    (source, category, external_id, external_fields — parsed from JSON
+    when present). Tenant-scoped when `tenant_id` is set; unlike
+    `get_system_refs` (Stage 2d, no tenant filter), this is a display
+    read for the entity detail endpoint."""
+    if tenant_id is None:
+        rows = conn.execute(
+            """
+            SELECT source, category, external_id, external_fields
+              FROM system_references
+             WHERE canonical_id = ?
+             ORDER BY source, external_id
+            """,
+            (canonical_id,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT s.source, s.category, s.external_id, s.external_fields
+              FROM system_references AS s
+              JOIN canonical_entities AS c ON c.canonical_id = s.canonical_id
+             WHERE s.canonical_id = ?
+               AND c.tenant_id = ?
+             ORDER BY s.source, s.external_id
+            """,
+            (canonical_id, tenant_id),
+        ).fetchall()
+    results: list[dict[str, Any]] = []
+    for source, category, external_id, fields_json in rows:
+        fields: Optional[dict[str, Any]] = None
+        if fields_json:
+            try:
+                fields = json.loads(fields_json)
+            except (TypeError, ValueError):
+                fields = None
+        results.append(
+            {
+                "source": source,
+                "category": category,
+                "external_id": external_id,
+                "external_fields": fields,
+            }
+        )
+    return results
+
+
+def get_edges_for_canonical(
+    conn: sqlite3.Connection,
+    canonical_id: str,
+    tenant_id: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    """Return every `entity_edges` row touching `canonical_id`, in either
+    direction, as a dict. Tenant scoping requires BOTH endpoints in
+    scope, matching `_neighbors`'s convention above."""
+    if tenant_id is None:
+        rows = conn.execute(
+            """
+            SELECT edge_id, source_node, target_node, relationship,
+                   source_category, target_category, weight, approval_count
+              FROM entity_edges
+             WHERE source_node = ? OR target_node = ?
+             ORDER BY edge_id
+            """,
+            (canonical_id, canonical_id),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT e.edge_id, e.source_node, e.target_node, e.relationship,
+                   e.source_category, e.target_category, e.weight, e.approval_count
+              FROM entity_edges AS e
+              JOIN canonical_entities AS cs ON cs.canonical_id = e.source_node
+              JOIN canonical_entities AS ct ON ct.canonical_id = e.target_node
+             WHERE (e.source_node = ? OR e.target_node = ?)
+               AND cs.tenant_id = ?
+               AND ct.tenant_id = ?
+             ORDER BY e.edge_id
+            """,
+            (canonical_id, canonical_id, tenant_id, tenant_id),
+        ).fetchall()
+    return [
+        {
+            "edge_id": edge_id,
+            "source_node": source_node,
+            "target_node": target_node,
+            "relationship": relationship,
+            "source_category": source_category,
+            "target_category": target_category,
+            "weight": weight,
+            "approval_count": approval_count,
+        }
+        for edge_id, source_node, target_node, relationship, source_category, target_category, weight, approval_count in rows
+    ]
+
+
+def list_entities_for_search(
+    conn: sqlite3.Connection,
+    tenant_id: Optional[str] = None,
+) -> list[tuple[str, str, list[str]]]:
+    """Return `(canonical_id, canonical_name, alias_values)` for every
+    tenant-scoped canonical — raw rows only, for a caller outside this
+    module to fuzzy-score (this file must not import RapidFuzz; see
+    `tests/test_blocking.py::test_no_rapidfuzz_in_matching_modules`)."""
+    if tenant_id is None:
+        canon_rows = conn.execute(
+            "SELECT canonical_id, canonical_name FROM canonical_entities"
+        ).fetchall()
+    else:
+        canon_rows = conn.execute(
+            "SELECT canonical_id, canonical_name FROM canonical_entities WHERE tenant_id = ?",
+            (tenant_id,),
+        ).fetchall()
+
+    aliases_by_canonical: dict[str, list[str]] = {}
+    for canonical_id, _name in canon_rows:
+        aliases_by_canonical[canonical_id] = get_aliases(conn, canonical_id, tenant_id)
+
+    return [
+        (canonical_id, name, aliases_by_canonical.get(canonical_id, []))
+        for canonical_id, name in canon_rows
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Stage 4 reads (threshold / cluster conflict)
 # ---------------------------------------------------------------------------
 
