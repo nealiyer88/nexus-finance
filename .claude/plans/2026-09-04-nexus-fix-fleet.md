@@ -6,8 +6,8 @@ Plan type: PRODUCT pass (`/army-plan product`). Date: 2026-09-04. Repo: `nexus-f
 Source of record: `FIX_LIST.md` (29 items, compiled 2026-09-03, all observed in the shipped
 tree or in a live run).
 
-This plan queues 14 features, IDs 18–31, closing 24 of the 29 FIX_LIST items. The remaining
-5 are excluded with reasons in "Explicitly excluded". Nothing in this document builds
+This plan queues 14 features, IDs 18–31, closing 23 of the 29 FIX_LIST items. The remaining
+6 (7, 8, 13, 27, 28, 29) are excluded with reasons in "Explicitly excluded". Nothing in this document builds
 anything; it defines what gets built and in what order.
 
 ---
@@ -77,22 +77,35 @@ as of 2026-09-04:
 ### 18 — `matching-accuracy-harness` — Size L
 Closes: **item 1**.
 A scored evaluation over `tests/fixtures/canonical_ground_truth.json` that reports
-precision, recall, F1 and a false-merge count, broken out per category pair, runnable as a
-single command and asserted in CI against a floor. Today nothing in the tree measures
+precision, recall, F1 and a false-merge count, broken out per entity category (org/person),
+runnable as a single command and asserted in CI against a floor. (The ground-truth fixture
+is single-pair — accounting↔psa only, all 1:1 — so a per-category-pair breakout is
+meaningless today. Small-N caveat: at ~44 pairs one flip moves F1 about 2 points, so the CI
+floor is coarse until feature 29 re-baselines.) Today nothing in the tree measures
 accuracy: the closest existing assertion is a bottom-cutoff floor over ground-truth pairs,
 and the "auto-match rate" on the overview page counts decisions made, not decisions correct.
 **THIS IS THE KEYSTONE** — items 9, 10, 22, 23 and 29 are unmeasurable without it, and every
 downstream matching change is unfalsifiable until it lands.
+**Harness contract (pinned so 22/23/29 cite it by name):** module
+`core/evaluation/accuracy.py`, CLI `scripts/evaluate_matching.py`, plus a pytest test
+asserting the floor (so it runs under the standard `TEST_CMD`).
 Deps: 8a, 8b, 12.
 
 ### 19 — `decision-reasoning-persistence` — Size M
 Closes: **item 2**.
-`MatchResult.reasoning_trace` is built in `core/matching/engine.py` and handed to Stage 6,
-but its only durable home is a Postgres-only table written solely inside `if
-pg_is_available()`. On the default SQLite path — the only real engine in V1 — it is
-discarded, so auto-approved matches (the majority) have no stored account of why they
-merged. Persist the trace on the SQLite path for EVERY disposition, including auto-approve
-and no-match, not only inside the Postgres branch.
+`MatchResult.reasoning_trace` is built in `core/matching/engine.py` and handed to Stage 6.
+For QUEUE_FOR_REVIEW dispositions it already persists on SQLite via the proposal JSON in
+`pending_decisions` (`core/matching/engine.py:170` → `_write_queued` → `enqueue_pending`,
+`core/matching/pending_store.py:546`). The Postgres-only trace write lives in
+`core/graph/resolution.py` (~line 176), inside `if pg_is_available()`. What is discarded on
+the default SQLite path — the only real engine in V1 — are the AUTO-APPROVE and NO-MATCH
+dispositions, so auto-approved matches (the majority) have no stored account of why they
+merged.
+**In scope:** ship a new SQLite migration `db/migrations/005_decision_traces_sqlite.sql`
+creating table `decision_traces` (id, tenant_id, source entity refs, `canonical_entity_id`
+nullable, disposition, score, `reasoning_trace` JSON text, created_at), written for EVERY
+disposition including auto-approve and no-match. This table is the frozen contract feature
+20 reads.
 Deps: 10, 10b, 12.
 
 ### 20 — `match-explanation-ui` — Size M
@@ -102,6 +115,8 @@ signal breakdown and graph evidence as raw dict text — internal field names on
 an explanation. Replace it with a readable panel: which signals fired, what each
 contributed, what the graph corroboration was, and what would have changed the outcome.
 Reads the persisted trace from 19.
+Reads the `decision_traces` contract frozen by 19 (plus the existing `pending_decisions`
+proposal JSON for queued items).
 Deps: 11, 16, 19.
 
 ### 21 — `training-corpus-capture` — Size L
@@ -115,6 +130,14 @@ disposition is captured; collect hard negatives; add a read path so the corpus i
 inspectable and exportable rather than write-only. **Redaction and leak-check discipline
 must be preserved exactly** — `core/matching/redaction.py` and the `leak_check` calls in
 `core/matching/llm_fallback.py` are load-bearing.
+**CRITICAL (privacy):** today `store_training_pair` copies `redacted_prompt` verbatim from
+the Stage-5 LLM row found by `source_call_id` (`core/matching/training_data.py:137-151`),
+and `llm_training_data.redacted_prompt` is NOT NULL (`db/migrations/002:13`). Non-LLM
+captures have no redacted text to copy. In scope: non-LLM captures MUST invoke the existing
+redaction functions (the same ones Stage 5 uses) on the pair context before writing, and
+run `leak_check` on the result; raw text or placeholder values in `redacted_prompt` are
+forbidden; `source_call_id` becomes nullable via a migration named in the brief. No new
+redaction logic — reuse the existing redactors exactly.
 Deps: 9, 10b, 19.
 
 ### 22 — `threshold-calibration` — Size M
@@ -123,7 +146,9 @@ Closes: **items 9, 10**.
 0.50` are module constants in `core/matching/disposition.py`, derived from nothing. Derive
 the cutoffs from measured outcomes using the harness from 18, and produce a signal-ablation
 report answering directly whether `fasttext_cosine` earns its 0.05/0.12 weight — the premise
-that justified the fastText mandate was measured false in the 8a build record.
+that justified the fastText mandate was measured false in the 8a build record. The ablation
+report must be generated by a module invoked from a pytest test that asserts the report
+exists and the floor holds.
 Deps: 18.
 
 ### 23 — `blocking-channel-fairness` — Size S
@@ -131,8 +156,13 @@ Closes: **item 11**.
 `EmbeddingIndex.query` returns top_k=50 regardless of cosine quality, and `blocking.py`
 evicts embed-only candidates first when the 50-candidate cap is hit. Under a full candidate
 set the embedding channel can therefore contribute nothing while still appearing wired. Fix
-the eviction policy and prove the change with the accuracy harness — this feature is not
-done on a code change alone, it is done when 18 shows the delta.
+the eviction policy. Done when: 23 ships an in-scope test fixture that forces >50 candidates
+so the eviction path actually fires (the eviction only triggers above the 50-candidate cap,
+and the current corpus never triggers it), plus a pytest asserting the embedding channel
+survives eviction fairly. Scope caveat: a fair eviction without a real cosine quality floor
+in `core/matching/indices.py` reintroduces noise-evicts-lexical, so the fix pairs eviction
+fairness with a cosine floor — keep rating S only if that stays one focused change, else
+re-rate M at sizing.
 Deps: 18.
 
 ### 24 — `runtime-entrypoints` — Size M
@@ -161,11 +191,13 @@ Deps: 13, 14, 15, 16.
 
 ### 26 — `integration-tier-coverage` — Size M
 Closes: **item 16**.
-Features 12a, 13, 14 and 15 each added zero integration-marked tests; the tier has been flat
-at 35 executed since feature 16 while the suite grew 543 → 639. Add integration coverage for
+Features 12a, 13, 14 and 15 each added zero integration-marked tests; the integration tier
+has been flat across recent features while the overall suite kept growing. Measure the
+baseline at build start — never pin it in the brief. Add integration coverage for
 the paths that have only ever been proven by hand in a session: real ingestion writing rows,
 callbacks returning data against a populated store, and first run against an unprovisioned
-store.
+store. Acceptance: each named prior feature has integration-marked tests that exist and
+execute under the integration marker; no absolute counts.
 Deps: 10c, 12a, 15.
 
 ### 27 — `legacy-qa-audit` — Size M
@@ -173,6 +205,9 @@ Closes: **items 17, 18**.
 Features 1–9 shipped under a QA gate that always reported pass and has never been audited;
 `GATE_DEBT.md` holds 6 unreviewed entries. Audit both. Every finding is either fixed or
 explicitly accepted in writing — "unknown what it missed" is not an acceptable end state.
+Criterion: every audited item ends with either a repaired test or a new `GATE_DEBT.md`
+entry, asserted by a pytest that the audit ledger file exists and is well-formed (the
+judgment stays human, the artifact is mechanical).
 Deps: none. This feature is dependency-free and can be co-scheduled freely.
 
 ### 28 — `dashboard-page-completion` — Size M
@@ -181,16 +216,23 @@ Closes: **items 20, 21, 22**.
 the page exists, the feature does not. `dashboard/pages/connectors.py` hardcodes an empty
 connector list behind "Coming Soon" cards. `dashboard/pages/ar_reconciliation.py` labels
 zero-activity clients `MATCHED`, but zero versus zero is silence, not agreement, and needs a
-distinct no-activity state. **THREE DISJOINT PAGE FILES — the natural fan-out candidate.**
+distinct no-activity state. Fan-out shape decided at sizing: the units are not three
+disjoint page files — the audit_log unit cannot finish inside its page file (the audit
+table exists only in the Postgres DDL; SQLite has no audit table, so it needs a migration
+outside the page file), and all three units share `tests/conftest.py`. Likely shape:
+connectors + ar-reconciliation pages as the two disjoint fan-out units, audit_log as a
+separate unit owning its own migration file. (The `dashboard/app.py` WSGI export belongs
+to feature 24, not 28.)
 Deps: 14, 15, 16, 12a.
 
 ### 29 — `fixture-corpus-expansion` — Size L
 Closes: **items 24, 25**.
-Grow beyond 46+45 entities and 6+4 transactions to cover what is entirely absent: non-English
+Grow beyond the current small fixture corpus to cover what is entirely absent: non-English
 and non-Latin names; duplicates within a single source; one-to-many and many-to-many merges
 (every ground-truth entity today is a clean 1:1 pair); records with missing or empty names;
 entities that change over time; multi-tenant collisions; and enough transaction volume to
-actually exercise Signal B3 (amount co-occurrence), which is barely exercised at 10 rows.
+actually exercise Signal B3 (amount co-occurrence), which the current small fixture corpus
+barely exercises.
 `tests/fixtures/canonical_ground_truth.json` must be extended in lockstep — new fixtures
 without matching ground truth make 18 report a worse number for no real reason.
 Deps: 18, 8a, 8b.
@@ -198,7 +240,12 @@ Deps: 18, 8a, 8b.
 ### 30 — `tenant-slug-uniqueness` — Size S
 Closes: **item 26**.
 `tenants.slug` carries a UNIQUE constraint on a name-derived slug, so two customers with the
-same name cannot both exist. Fix the uniqueness model.
+same name cannot both exist. The constraint exists only in the Postgres DDL (`db/schema.sql`,
+migration 001), which rules §0 marks `[PLANNED]`/dormant; `db/schema_sqlite.sql` has no
+`tenants` table at all — so as originally scoped this feature changes unexecuted DDL.
+Rescoped: fix the Postgres DDL and document that SQLite currently has no `tenants` table.
+**OPEN DECISION:** whether item 26 is thereby closed for V1 or deferred until the Postgres
+path is live.
 Deps: 10a, 10c.
 
 ### 31 — `design-system` — Size L
@@ -206,14 +253,15 @@ Closes: **item 19**.
 The dashboard is default Dash components with no design system, no spacing scale and no type
 scale — functional and hard to look at. **Deliberately LAST**: design once the content is
 settled, so the system is applied to finished pages rather than to pages that 20 and 28 are
-still changing.
+still changing. Keeps its human visual review, but adds a mechanical gate
+(design-lint/snapshot checks) so the reality-checker has something runnable.
 Deps: 20, 28.
 
 ---
 
 ## Explicitly excluded
 
-Five of the 29 items are not queued. Reasons, one per item.
+Six of the 29 items are not queued. Reasons, one per item.
 
 - **Items 7 and 8 — XGBoost pairwise classifier, fine-tuned embeddings.** Deferred by
   decision 1. Note this is deferral in line with the spec, not a cut: the v3 spec itself
@@ -288,10 +336,15 @@ Rationale for the order, not the IDs:
 - **31 last**, by design.
 
 **Dependencies are enforced independently of row order.** Each row's `Depends On` column is
-checked against SHIPPED status before selection, so a mis-ordered row cannot build early — it
-is simply skipped until its deps land. Row order decides which of several *eligible* rows is
-taken first. The order above is chosen so that the eligible set is almost always a single
-row, which keeps the build deterministic.
+checked against SHIPPED status before selection. Row order decides which of several
+*eligible* rows is taken first. The eligible set is NOT usually a single row: at insertion,
+six rows (27, 24, 25, 26, 30, 28) have fully-SHIPPED deps and are simultaneously eligible,
+and the deliberate orderings (27-first, 23-before-22, 25/26-before-28) hold only while every
+earlier row ships cleanly. **Operator rule: if any row BLOCKS, STOP the loop and triage
+before letting file-order skip ahead** (e.g. 22 must never calibrate before 23 lands).
+Known parser caveat, not a safety property: "a mis-ordered row cannot build early" is not
+guaranteed — the dep check is a regex substring per row, and SHIPPED row 8a's Spec cell
+"v4 §5,9,17" contains bare 9 and 17, so dep matching can false-positive.
 
 ---
 
@@ -303,8 +356,11 @@ row, which keeps the build deterministic.
    scheduler's overlap and contract-violation checks, the concurrent write fences — is
    unexercised in this repo. Stating that plainly: **the first fan-out is itself a test of
    the harness, not just of the feature.** The first fan-out should therefore be a feature
-   with genuinely disjoint scopes, and **28 is the safest first candidate** — three separate
-   page files under `dashboard/pages/` with no shared surface. **Not 18.** 18 is the keystone,
+   with genuinely disjoint scopes, and **28 is the likeliest first candidate**, with its
+   fan-out shape decided at sizing — likely connectors + ar-reconciliation pages as the two
+   disjoint units, audit_log as a separate unit owning its own migration file (see the 28
+   entry: the page files are not fully disjoint, and all three share `tests/conftest.py`).
+   **Not 18.** 18 is the keystone,
    it is L, and a harness failure on it stalls nine downstream features. Run 18 on the
    single-writer path.
 2. **Brief/repo drift is the dominant historical failure mode.** Rounds of rework in the last
@@ -347,8 +403,9 @@ import in `tests/` fails to collect.
 
 `./rocket.sh schedule` spawns no agents and costs nothing — run it freely.
 
-**Current baseline: 639 passed, 35 integration-marked executed.** Any feature that leaves the
-integration count at 35 has not moved item 16.
+**Record the baseline (passed count and integration-marked count) at build start; do not pin
+it here.** Any feature that leaves the integration count at the baseline recorded at build
+start has not moved item 16.
 
 **Each feature must be verified by RUNNING it, not by reading its tests.** This is not
 boilerplate: the 2026-09-03 session shipped three green-but-broken features, including an
@@ -390,3 +447,9 @@ The sizing pass (`/army-plan build`) is the next action. It:
 
 Only after that: queue rows are inserted in the file order given above, and **nothing builds
 without an explicit go.**
+
+---
+
+Adversarial review (2026-09-07): three-reviewer pass (coverage/queue mechanics, reality-check
+survivability, keystone technical soundness) — 2 blockers, 6 majors amended above; plan shape
+(14 features, order, exclusions) unchanged.
